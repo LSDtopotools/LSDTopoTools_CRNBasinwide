@@ -236,7 +236,7 @@ void LSDIndexRaster::read_raster(string filename, string extension)
   string dot = ".";
   string_filename = filename+dot+extension;
   cout << "The filename is " << string_filename << endl;
-  int DataType;
+  int DataType = 2;
 
   if (extension == "asc")
   {
@@ -1113,7 +1113,7 @@ LSDIndexRaster LSDIndexRaster::clip_to_smaller_raster(LSDIndexRaster& smaller_ra
   
   for(int row = 0; row< New_NRows; row++)
   {
-    for(int col = 0; col<=New_NCols; col++)
+    for(int col = 0; col<New_NCols; col++)
     {
        NewData[row][col] = RasterData[row+YUL_row][col+XLL_col];
     }
@@ -1201,7 +1201,7 @@ LSDIndexRaster LSDIndexRaster::clip_to_smaller_raster(LSDRaster& smaller_raster)
   
   for(int row = 0; row< New_NRows; row++)
   {
-    for(int col = 0; col<=New_NCols; col++)
+    for(int col = 0; col<New_NCols; col++)
     {
        NewData[row][col] = RasterData[row+YUL_row][col+XLL_col];
     }
@@ -2181,6 +2181,57 @@ LSDIndexRaster LSDIndexRaster::remove_holes_in_patches(int window_radius)
   //create new LSDIndexRaster with the filled patches
   LSDIndexRaster FilledPatches(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,FilledRaster,GeoReferencingStrings);
   return FilledPatches;  
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// Method to remove checkerboard pattern from an integer raster (at the moment set to run on
+// a raster made up of 0s and 1s).
+// FJC 22/10/15
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+LSDIndexRaster LSDIndexRaster::remove_checkerboard_pattern()
+{
+  Array2D<int> RasterArray = RasterData;
+  Array2D<int> FilledArray(NRows, NCols, 0);
+  int count = 0;
+  //search the neighbours of each pixel for 1 values within the window radius
+  for (int row = 0; row < NRows; row ++)
+  {
+    for (int col = 0; col < NCols; col++)
+    {
+      if (RasterArray[row][col] == 1) FilledArray[row][col] = 1;
+      if (RasterArray[row][col] == 0)
+      {    
+        // set exceptions for end rows and cols
+        int min_row = row-1;
+        int max_row = row+1;
+        if (min_row < 0) min_row = 0;
+        if (max_row >= NRows) max_row = NRows-1;
+        
+        int min_col = col-1;
+        int max_col = col+1;
+        if (min_col < 0) min_col = 0;
+        if (max_col >= NCols) max_col = NCols-1;
+        
+        // check whether N, S, E, and W pixels are equal to 1
+        if (RasterArray[min_row][col]  == 1) count++;               //north
+        if (RasterArray[max_row][col] == 1) count++;               //south
+        if (RasterArray[row][min_col]  == 1) count++;               //east
+        if (RasterArray[row][max_col] == 1) count++;                //west
+        if (count == 4)
+        {
+          //fill in pixel
+          FilledArray[row][col] = 1;
+          cout << "Filled in pixel, woohoo" << endl;
+        }    
+        count = 0;    
+      }
+    }
+  }
+  
+  //create new LSDIndexRaster with the filled patches
+  LSDIndexRaster FilledRaster(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,FilledArray,GeoReferencingStrings);
+  return FilledRaster; 
+  
 }
 
 
