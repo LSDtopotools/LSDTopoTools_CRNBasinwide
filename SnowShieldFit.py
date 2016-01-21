@@ -1,5 +1,5 @@
-# This function is used for assimilating erosion data and fitting it with 
-# a double gaussian function
+# This function is used to calcualte the parameters for the effective depth
+# of snow shielding for use in the CRN calculator
 """
 Created on Tue Mar 31 10:38:44 2015
 @author: smudd
@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit # Import the curve fitting module
 
 
+# this function calculates the root mean square error
 def RMSE(data,prediction):
     sum_err = 0
     n = len(data)
@@ -58,8 +59,8 @@ def fit_bilinear_SWE_from_file(filename):
     # State the filename
     #filename = 'c:\\Users\\smudd\\Documents\\Papers\\Tidal_paper_padova\\Wind_Data\\s_andrea_ok.txt'    
     
-    # First load the erosion data file. This data just has an erosion rate 
-    # and a depth on every line
+    # First load the erosion data file. This data just has an elevation and
+    # a SWE in mm on each line
     SWE_data = np.loadtxt(filename)
     elevations = SWE_data[:,0]
     SWE_in_mm = SWE_data[:,1]
@@ -121,16 +122,7 @@ def plot_SWE_effD_fit(elevations,SWE_in_effDepth,popt_bl,SWE_bl_fit,RMSE_val):
     plt.xlabel('Elevation (m)')
     plt.ylabel('data and fit, in Effective depth g/cm^2')
     ax1.legend(loc='upper left')
-    #plt.title('velocity: ' + str(threshold_velocity))
-    
-    # The second subplot plots the data vs the fit
-    #ax2=plt.subplot(212)
-    #ax2.plot(trunc_x,trunc_pdf,'ro',label='truncated pdf')
-    #ax2.plot(trunc_x,y_exp_fit,'gx',label='fit pdf')
-    #plt.xlabel('x')
-    #plt.ylabel('pdf')
-    #ax2.legend(loc='upper right')
-    #plt.title('RMSE: ' + str(RMSE))
+
     
     #plot_fname = "Fit_plot_bl.png"
     #plt.savefig(plot_fname, format='png')
