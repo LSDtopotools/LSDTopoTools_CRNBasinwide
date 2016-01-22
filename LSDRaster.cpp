@@ -175,6 +175,37 @@ void LSDRaster::create(int nrows, int ncols, float xmin, float ymin,
 }
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// this overloaded function creates a raster filled with no data values, 
+// but the data type is double-precision floating point numbers
+// DAV 2015
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void LSDRaster::create(int nrows, int ncols, double xmin, double ymin,
+            double cellsize, double ndv, Array2D<double> data)
+{
+  NRows = nrows;
+  NCols = ncols;
+  XMinimum = xmin;
+  YMinimum = ymin;
+  DataResolution = cellsize;
+  NoDataValue = ndv;
+  
+  // Using the <double> data member
+  RasterData_dbl = data.copy();
+
+  if (RasterData_dbl.dim1() != NRows)
+  {
+    cout << "LSDRaster line 89 dimension of data is not the same as stated in NRows!" << endl;
+    exit(EXIT_FAILURE);
+  }
+  if (RasterData_dbl.dim2() != NCols)
+  {
+    cout << "LSDRaster line 94 dimension of data is not the same as stated in NRows!" << endl;
+    exit(EXIT_FAILURE);
+  }
+
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Like the above function, but copies the GeoReferencing
 // SMM 2012
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -814,8 +845,8 @@ void LSDRaster::write_raster(string filename, string extension)
        << "\nyllcorner\t" << setprecision(14) << YMinimum
        << "\ncellsize\t" << DataResolution
        << "\nNODATA_value\t" << NoDataValue << endl;
-
-
+    
+    
     for (int i=0; i<NRows; ++i)
     {
       for (int j=0; j<NCols; ++j)
@@ -946,6 +977,58 @@ void LSDRaster::write_raster(string filename, string extension)
   {
     cout << "You did not enter and approprate extension!" << endl
     << "You entered: " << extension << " options are flt, bil and asc" << endl;
+    exit(EXIT_FAILURE);
+   }
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// write_double_raster
+// this function writes a raster. One has to give the filename and extension
+// currently the options are for .asc files only (Sorry!)
+//
+// DAV 2015
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void LSDRaster::write_double_raster(string filename, string extension)
+{
+  string string_filename;
+  string dot = ".";
+  string_filename = filename+dot+extension;
+  cout << "The filename is " << string_filename << endl;
+
+  // this first bit of logic is for the asc file.
+  if (extension == "asc")
+  {
+    // open the data file
+    ofstream data_out(string_filename.c_str());
+
+    if( data_out.fail() )
+    {
+      cout << "\nFATAL ERROR: unable to write to " << string_filename << endl;
+      exit(EXIT_FAILURE);
+    }
+
+    data_out <<  "ncols\t" << NCols
+       << "\nnrows\t" << NRows
+       << "\nxllcorner\t" << setprecision(14) << XMinimum
+       << "\nyllcorner\t" << setprecision(14) << YMinimum
+       << "\ncellsize\t" << DataResolution
+       << "\nNODATA_value\t" << NoDataValue << endl;
+    
+    
+    for (int i=0; i<NRows; ++i)
+    {
+      for (int j=0; j<NCols; ++j)
+      {
+        data_out << setprecision(6) << RasterData_dbl[i][j] << " ";
+      }
+      if (i != NRows-1) data_out << endl;
+    }
+    data_out.close();
+  }
+  else
+  {
+    cout << "You did not enter and approprate extension!" << endl
+    << "You entered: " << extension << " options are asc" << endl;
     exit(EXIT_FAILURE);
    }
 }
@@ -8432,6 +8515,8 @@ LSDRaster LSDRaster::clip_to_smaller_raster(LSDRaster& smaller_raster)
   
   cout << "Small Xmin: " << SR_XMinimum << " YMin: " << SR_YMinimum << " Xmax: "
        << SR_XMaximum << " YMax: " << SR_YMaximum << endl;
+       
+  cout << "This data resolution: " << DataResolution << " and smaller raster data resolution: " << SR_DataR << endl;
   
   
   // find the col of old raster that has the same Xlocations as the XLL of smaller raster
@@ -8455,6 +8540,21 @@ LSDRaster LSDRaster::clip_to_smaller_raster(LSDRaster& smaller_raster)
   int YLL_row = NRows - int((SR_YMinimum-YMinimum+0.5*DataResolution)/DataResolution);
   int YUL_row = NRows - int((SR_YMaximum-YMinimum+0.5*DataResolution)/DataResolution);
   
+  // check on the lower row:
+  cout << "Checking lower left row." << endl;
+  cout << "integer subtraction: " << int((SR_YMinimum-YMinimum+0.5*DataResolution)/DataResolution) << endl;
+  cout << "float subtraction: " <<  (SR_YMinimum-YMinimum+0.5*DataResolution)/DataResolution << endl;
+  
+  // this catches a weird rounding error. 
+  double int_sub =  double(int((SR_YMinimum-YMinimum+0.5*DataResolution)/DataResolution));
+  double flt_sub =  (SR_YMinimum-YMinimum+0.5*DataResolution)/DataResolution;
+  
+  if ((flt_sub- int_sub) > 0.9975)
+  {
+    YUL_row = YUL_row+1;
+  }
+  
+  
   // check these rows
   if (YLL_row < 0)
   {
@@ -8465,7 +8565,7 @@ LSDRaster LSDRaster::clip_to_smaller_raster(LSDRaster& smaller_raster)
     YUL_row = NRows-1;
   }
   
-  cout << "Small XLLCol: " << XLL_col << " XLR_col: " << XUL_col << " XLLrow: "
+  cout << "Small XLLCol: " << XLL_col << " XLR_col: " << XUL_col << " YLLrow: "
        << YLL_row << " YUL_row: " << YUL_row << endl;
 
 
@@ -9000,9 +9100,9 @@ LSDRaster LSDRaster::GaussianFilter(float sigma, int kr)
 //  geometric framework for channel network extraction from lidar: Nonlinear
 //  diffusion and geodesic paths, J. Geophys. Res., 115(F1), F01002,
 // doi:10.1029/2009JF001254.
-//  See also  Catté et al. (1992), Image Selective
+//  See also  Catte et al. (1992), Image Selective
 //  Smoothing and Edge Detection by Nonlinear Diffusion, SIAM J. Numer. Anal.,
-//  29(1), 182–193, doi:10.1137/0729012.
+//  29(1), 182-193, doi:10.1137/0729012.
 //
 //  David Milodowski, Feb 2015
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -10891,6 +10991,33 @@ LSDRaster LSDRaster::RemoveBelow(float Value){
 
 } 
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// Simple method to remove any values above a user supplied value from an LSDRaster. 
+//
+// Value is a float of the threshold above which values will be removed.
+// SWDG 25/11/15
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+LSDRaster LSDRaster::RemoveAbove(float Value){
+
+  Array2D<float> Data = RasterData.copy();
+
+    for(int i = 1; i < NRows-1; ++i){
+      for(int j = 1; j < NCols-1; ++j){
+
+        if (Data[i][j] != NoDataValue && Data[i][j] > Value){
+
+          Data[i][j] = NoDataValue;
+
+        }
+      }
+    }
+
+  LSDRaster Removed(NRows,NCols,XMinimum,YMinimum,DataResolution,NoDataValue,Data,GeoReferencingStrings);
+  return Removed;
+
+}
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // Apply a mask to an LSDRaster.  Mask designated by LSDIndexRaster containing 1
 // values for the pixels that need to be converted to nodata
@@ -10985,11 +11112,79 @@ float LSDRaster::get_threshold_for_floodplain(float bin_width, float peak_thresh
   vector<int> peak_indices;
   get_peak_indices(ProbabilityDensity, peak_threshold, peak_distance, peak_indices);
   
-  //first peak is the floodplain: get the midpoint of the bin with the peak
-  float threshold = Midpoints[peak_indices[0]];
+  //using second peak as the floodplain: get the midpoint of the bin with the peak
+  float threshold = Midpoints[peak_indices[1]];
   cout << "Threshold value: " << threshold << endl;
     
   return threshold;  
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// Function to set the threshold value to use in floodplain extraction using QQ plots
+// FJC 16/11/15
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+float LSDRaster::get_threshold_for_floodplain_QQ(string q_q_filename)
+{
+  //get vector of raster data
+  vector<float> raster_vector; 
+  for (int row = 0; row < NRows; row++) 
+  { 
+    for (int col = 0; col < NCols; col++) 
+    { 
+      if(RasterData[row][col] >= 0) raster_vector.push_back(RasterData[row][col]); 
+    } 
+  }
+  
+  vector<float> quantile_values,normal_variates,mn_values;
+  int N_points = 10000;//values.size();
+  quantile_quantile_analysis(raster_vector, quantile_values, normal_variates, mn_values, N_points);
+  ofstream ofs;
+  ofs.open(q_q_filename.c_str());
+  
+  if(ofs.fail())
+  {
+    cout << "\nFATAL ERROR: unable to write output_file" << endl;
+    exit(EXIT_FAILURE);
+  }
+  ofs << "normal_variate value\n";
+  int n_values = quantile_values.size();
+  for(int i = 0; i<n_values;++i)
+  {
+    ofs << normal_variates[i] << " " << quantile_values[i] << " " << mn_values[i] << "\n";
+  }
+  ofs.close();
+  
+  // Find q-q threshold
+  cout << "\t finding deviation from Gaussian distribution to define q-q threshold" << endl;
+  vector<int> indices;
+  int flag = 0;
+  float threshold_condition=0.99;
+  int threshold_index=0;
+  float threshold=0;
+  for(int i = 0; i<n_values; ++i)
+  {
+    if(normal_variates[i] <= 0)
+    {
+      if(mn_values[i]>threshold_condition*quantile_values[i])
+      {
+        if (flag==0)
+        {
+          flag = 1;
+          threshold_index = i;
+          threshold = quantile_values[i];
+          cout << "Quantile value at threshold: " << quantile_values[i] << " Normal variate: " << normal_variates[i] << endl;
+        }
+      }
+      else flag = 0;
+    }
+  }
+  
+  //float mean = get_mean(raster_vector);
+  //float standard_deviation = get_standard_deviation(raster_vector,mean);
+  //float threshold = mean+normal_variates[threshold_index]*standard_deviation;
+  //cout << "Mean: " << mean << " Standard deviation: " << standard_deviation << " Threshold value is: " << threshold << endl;
+  
+  return threshold;
 }
 
 #endif

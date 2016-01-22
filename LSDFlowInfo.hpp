@@ -329,7 +329,7 @@ class LSDFlowInfo
   /// @brief Method to ingest the channel heads raster generated using channel_heads_driver.cpp
   /// into a vector of source nodes so that an LSDJunctionNetwork can be created easily 
   /// from them.  **UPDATE** if the extension is a csv file it reads the node indices directly
-  ///
+  /// **UPDATE, FJC 20/01/16 - changed default input switch to 2**
   /// @details Assumes the FlowInfo object has the same dimensions as the channel heads raster.
   /// @param filename of the channel heads raster.
   /// @param extension of the channel heads raster.
@@ -337,7 +337,7 @@ class LSDFlowInfo
   /// @return Vector of source nodes.
   /// @author SWDG updated SMM updated DTM
   /// @date 6/6/14 Happy 3rd birthday Skye!! 
-  vector<int> Ingest_Channel_Heads(string filename, string extension, int input_switch = 0);
+  vector<int> Ingest_Channel_Heads(string filename, string extension, int input_switch = 2);
 
   // functions for getting flow, discharge, sediment flux, etc
 
@@ -631,6 +631,23 @@ class LSDFlowInfo
   /// @date 20/1/14
   void D8_Trace(int i, int j, LSDIndexRaster StreamNetwork, float& length, 
                    int& receiver_row, int& receiver_col, Array2D<int>& Path);
+
+  /// @brief Move the location of the channel head downslope by a user defined distance.
+  /// @param Sources a vector of node indexes of the channel heads to be moved.
+  /// @param MoveDist The distance in spatial units the head is to be moved.
+  /// @return A vector of node indexes pointing to the moved heads.
+  /// @author SWDG
+  /// @date 27/11/15
+  vector<int> MoveChannelHeadDown(vector<int> Sources, float MoveDist);
+
+  /// @brief Move the location of the channel head upslope by a user defined distance.
+  /// @param Sources a vector of node indexes of the channel heads to be moved.
+  /// @param MoveDist The distance in spatial units the head is to be moved.
+  /// @param DEM the elevation data.
+  /// @return A vector of node indexes pointing to the moved heads.
+  /// @author SWDG
+  /// @date 27/11/15
+  vector<int> MoveChannelHeadUp(vector<int> Sources, float MoveDist, LSDRaster DEM);
 
   void HilltopFlowRoutingOriginal(LSDRaster Elevation, LSDRaster Hilltops, LSDRaster Slope, LSDRaster Aspect, LSDIndexRaster StreamNetwork);
   

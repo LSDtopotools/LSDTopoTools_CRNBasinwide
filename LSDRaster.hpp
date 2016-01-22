@@ -144,6 +144,15 @@ class LSDRaster
   LSDRaster(int nrows, int ncols, float xmin, float ymin,
             float cellsize, float ndv, Array2D<float> data)
       { create(nrows, ncols, xmin, ymin, cellsize, ndv, data); }
+  
+  /// @brief Create an LSDRaster from memory, with the elvation
+  /// data stored as double precision floats.
+  /// @return LSDRaster    
+  /// @details Created to maintain compatibility with LSDCatchmentModel
+  /// @author DAV
+  LSDRaster(int nrows, int ncols, double xmin, double ymin,
+            double cellsize, double ndv, Array2D<double> data)
+      { create(nrows, ncols, xmin, ymin, cellsize, ndv, data); }    
 
   /// @brief Create an LSDRaster from memory, includes georeferencing
   /// @return LSDRaster
@@ -257,6 +266,16 @@ class LSDRaster
   /// @author SMM
   /// @date 01/01/12
   void write_raster(string filename, string extension);
+  
+  /// @brief This writes rasters from Arrays of type <double> to ascii format.
+  /// @details Sorry for duplicating a load of code, but I couldn't think
+  /// of a good way to overload the function without passing the raster data array or
+  /// breaking someone elses code. 
+  /// @param filename a string of the filename _without_ the extension.
+  /// @param extension a string of the extension _without_ the leading dot
+  /// @author DAV
+  /// @date 07-12-2015
+  void write_double_raster(string filename, string extension);
 
   /// @brief Checks to see if two rasters have the same dimensions
   /// @detail Does NOT check georeferencing
@@ -1584,8 +1603,8 @@ class LSDRaster
   ///  @details This follows the algorithm descibed in Passalacqua et al. (2010), A
   ///  geometric framework for channel network extraction from lidar: Nonlinear diffusion
   ///  and geodesic paths, J. Geophys. Res., 115(F1), F01002, doi:10.1029/2009JF001254.
-  ///  See also  Catté et al. (1992), Image Selective Smoothing and Edge Detection by
-  ///  Nonlinear Diffusion, SIAM J. Numer. Anal., 29(1), 182–193, doi:10.1137/0729012.
+  ///  See also  Catte et al. (1992), Image Selective Smoothing and Edge Detection by
+  ///  Nonlinear Diffusion, SIAM J. Numer. Anal., 29(1), 182-193, doi:10.1137/0729012.
   ///  @param timesteps the number of diffusion timesteps.  Suggest ~50 for 1m LiDAR
   ///  @param lambda percentile (selects the gradient percentile that is used to define lambda.  Suggest 90th percentile)
   ///  @param dt The timestep for each round of diffusion.  Suggest that this is 0.1 to avoid stability issues (same as Passalacqua et al. 2010)
@@ -1948,6 +1967,12 @@ class LSDRaster
   /// @date 22/6/15
   LSDRaster RemoveBelow(float Value);
 
+  /// @brief Simple method to remove any values above a user supplied value from an LSDRaster.
+  /// @param Value float of the threshold above which values will be removed.
+  /// @author SWDG
+  /// @date 25/11/15
+  LSDRaster RemoveAbove(float Value);
+
   /// @brief apply a mask to a raster dataset, converts pixels to nodata where mas=k=1
   /// @author DTM
   /// @date 25/08/2015
@@ -1980,6 +2005,12 @@ class LSDRaster
   /// @author FJC
   /// @date 16/11/15                                                  
   float get_threshold_for_floodplain(float bin_width, float peak_threshold, int peak_distance);
+  
+  /// @brief Function to get threshold from a raster using qq plots
+  /// @param q_q_filename Filename for the txt file with the data to visualise the qq plot
+  /// @author FJC
+  /// @date 16/11/15                                                  
+  float get_threshold_for_floodplain_QQ(string q_q_filename);
 
   protected:
 
@@ -2014,6 +2045,8 @@ class LSDRaster
   void create(string filename, string extension);
   void create(int ncols, int nrows, float xmin, float ymin,
               float cellsize, float ndv, Array2D<float> data);
+  void create(int ncols, int nrows, double xmin, double ymin,
+              double cellsize, double ndv, Array2D<double> data);
   void create(int ncols, int nrows, float xmin, float ymin,
               float cellsize, float ndv, Array2D<float> data, map<string,string> GRS);
 
