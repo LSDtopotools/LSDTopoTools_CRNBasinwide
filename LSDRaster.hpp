@@ -394,6 +394,16 @@ class LSDRaster
   /// @author SMM
   /// @date 13/11/2014
   bool check_if_point_is_in_raster(float X_coordinate,float Y_coordinate);
+
+  /// @brief Gets the row and column of a point in the raster
+  /// @param X_coordinate the x location of the point
+  /// @param Y_coordinate the y location of the point
+  /// @param row the row of the point, replaced upon running the routine
+  /// @param col the col of the point, replaced upon running the routine
+  /// @author SMM
+  /// @date 22/01/2016
+  void get_row_and_col_of_a_point(float X_coordinate,float Y_coordinate,int& row, int& col);
+
   
   /// @brief This function returns a vector with the X adn Y minimum and max
   ///   values
@@ -2011,6 +2021,13 @@ class LSDRaster
   /// @author FJC
   /// @date 16/11/15                                                  
   float get_threshold_for_floodplain_QQ(string q_q_filename);
+  
+  /// @brief Get the lengths in spatial units of each part of the channel network, divided by strahler order.
+  /// @param StreamNetwork Raster of the stream network coded by strahler order.
+  /// @param FlowDir Array of flowdirections from FlowInfo (Not D-inf).
+  /// @author SWDG
+  /// @date 17/1/16                                                  
+  string ChannelLengthByOrder(LSDIndexRaster& StreamNetwork, Array2D<int> FlowDir);
 
   protected:
 

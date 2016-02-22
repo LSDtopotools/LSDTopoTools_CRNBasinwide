@@ -851,10 +851,14 @@ vector<double> LSDCRNParticle::apparent_erosion_10Be_COSMOCALC(double rho, LSDCR
   {
     CRNp.set_Granger_parameters();
   }
+  else if (Muon_scaling == "newCRONUS" )
+  {
+    CRNp.set_newCRONUS_parameters();
+  }
   else
   {
     cout << "You didn't set the muon scaling." << endl
-         << "Options are Schaller, Braucher and Granger." << endl
+         << "Options are Schaller, Braucher, newCRONUS, and Granger." << endl
          << "You chose: " << Muon_scaling << endl
          << "Defaulting to Braucher et al (2009) scaling" << endl;
     CRNp.set_Braucher_parameters();     
@@ -1041,10 +1045,14 @@ vector<double> LSDCRNParticle::apparent_erosion_26Al_COSMOCALC(double rho, LSDCR
   {
     CRNp.set_Granger_parameters();
   }
+  else if (Muon_scaling == "newCRONUS" )
+  {
+    CRNp.set_newCRONUS_parameters();
+  }
   else
   {
     cout << "You didn't set the muon scaling." << endl
-         << "Options are Schaller, Braucher and Granger." << endl
+         << "Options are Schaller, Braucher, newCRONUS, and Granger." << endl
          << "You chose: " << Muon_scaling << endl
          << "Defaulting to Braucher et al (2009) scaling" << endl;
     CRNp.set_Braucher_parameters();     
@@ -2270,6 +2278,7 @@ vector<double> LSDCRNParticle::CRONUS_get_Al_Be_erosion(LSDCRNParameters& LSDCRN
   
   // first scale the thickness
   double thickSF = thickness_scaling_factor(LSDCRNP, use_CRONUS);
+  cout << "thickSF is: " << thickSF << endl;
   
   // Now get the initial guess
   vector<double> initial_guess = CRONUS_initial_guess(LSDCRNP, pressure, lat, 

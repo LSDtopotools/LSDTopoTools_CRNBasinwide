@@ -85,6 +85,14 @@ class LSDCosmoData
     /// @date 06/02/2015
     LSDCosmoData( string path, string file_prefix)  { create(path,file_prefix); }
     
+    //// @brief This initiates some default parameters
+    /// @detail These parameters will be overwritten by any parameters
+    ///  supplied by the parameter file
+    /// @author SMM
+    /// @date 14/02/2016
+    void initiate_default_parameters();
+    
+    
     /// @brief  THis function loads the crn data rom either a csv or text file
     /// @param filename the name of the file
     /// @param filetype this is either csv or txt
@@ -113,9 +121,31 @@ class LSDCosmoData
     ///  the parameter value
     /// @param filename a string of the full filename
     /// @author SMM
-    /// @date 02/03/2015
+    /// @date 02/02/2016
     void load_parameters(string filename);
-    
+   
+    /// @brief This loads information about any soil samples
+    /// The file contains several columns:
+    /// sampleID,sample_top_depth,sample_bottom_depth,density
+    /// The file prefix needs to be the same as the other files, and should
+    /// have the extension _CRNSoilInfo.csv
+    /// @detail The top depths and sample thicknesses need to be in cm
+    ///   The densities need to be in kg/m^3
+    /// @param filename a string of the full filename
+    /// @author SMM
+    /// @date 02/03/2015
+    void load_soil_info(string filename);
+
+    /// @brief This checks on the filenames to see if the files exist.
+    /// @param crn_fname a string with the name (including path) of the CRN file
+    /// @param Rasters_fname a string with the name (including path) of the Rasters file
+    /// @param parameters_fname a string with the name (including path) of the parameters file
+    /// @param soil_fname a string with the name (including path) of the soil file
+    /// @author SMM
+    /// @date 14/02/2016 
+    void check_files(string crn_fname,string Rasters_fname,string parameters_fname,
+                               string soil_fname);
+
     /// @brief this gets the names of the DEMs to be used in the analysis
     /// @detail only returns the DEM, not snow shielding, topo shielding, etc
     ///  rasters
@@ -182,6 +212,14 @@ class LSDCosmoData
     /// @date 15/07/2015
     void RunShielding(string path, string prefix);
 
+    /// @brief This function calculates and then returns a production raster
+    /// @param Elevation_data a raster holding the elevations
+    /// @param path_to_atmospheric_data a string that holds the path of the atmospheric data
+    /// @author SMM
+    /// @date 28/01/2016
+    LSDRaster calculate_production_raster(LSDRaster& Elevation_Data,
+                                          string path_to_atmospheric_data);
+
     /// @brief this function calculates the UTM coordinates of all the sample
     ///  points for a given UTM zone. 
     /// @param UTM_zone the UTM zone
@@ -225,6 +263,26 @@ class LSDCosmoData
     /// @brief This function computes erosion rates and uncertainties for 
     ///  a given DEM. It is wrapped by a function that goes through
     ///  the list of DEM, providing this function with the raster names
+    ///  and the parameters for the model run . This version can take a raster
+    ///  with known erosion rates that can be used for nesting of basins
+    /// @param Raster_names a vector of strings with 4 elements:
+    ///  [0] = DEM_filename
+    ///  [1] = Snow_shield_raster_name OR const_snow_shield in g/cm^2
+    ///  [2] = Self_shield_raster_name OR const_self_shield in g/cm^2
+    ///  [3] = Toposhield_raster_name 
+    ///  It there is no DEM then this is set to "NULL"
+    ///  @param CRN_params this contains the single shielding depths for snow
+    ///   and self shielding if the rasters are not supplied. 
+    /// @param known_eff_erosion an LSDRaster with known erosion rates in g/cm^2/yr
+    /// @author SMM
+    /// @date 12/02/2016
+    void full_shielding_cosmogenic_analysis_nested(vector<string> Raster_names,
+                            vector<double> CRN_params, 
+                            LSDRaster& known_eff_erosion);
+
+    /// @brief This function computes erosion rates and uncertainties for 
+    ///  a given DEM. It is wrapped by a function that goes through
+    ///  the list of DEM, providing this function with the raster names
     ///  and the parameters for the model run. This version is for spawned rasters
     /// @detail Because this is spawned, each raster only corresponds to one 
     ///   sample, which the function finds from the sample name corresponding
@@ -238,9 +296,130 @@ class LSDCosmoData
     ///  @param CRN_params this contains the single shielding depths for snow
     ///   and self shielding if the rasters are not supplied. 
     /// @author SMM
-    /// @date 30/10/2015
+    /// @date 30/01/2016
     void full_shielding_cosmogenic_analysis_for_spawned(vector<string> Raster_names,
                             vector<double> CRN_params);
+
+    /// @brief This function computes erosion rates and uncertainties for 
+    ///  a given det of soil data, 
+    /// @param Raster_names a vector of strings with 4 elements:
+    ///  [0] = DEM_filename
+    ///  [1] = Snow_shield_raster_name OR const_snow_shield in g/cm^2
+    ///  [2] = Self_shield_raster_name OR const_self_shield in g/cm^2
+    ///  [3] = Toposhield_raster_name 
+    ///  It there is no DEM then this is set to "NULL"
+    ///  @param CRN_params this contains the single shielding depths for snow
+    ///   and self shielding if the rasters are not supplied. 
+    /// @author SMM
+    /// @date 22/01/2016
+    void Soil_sample_calculator(vector<string> Raster_names,
+                            vector<double> CRN_params);
+
+    /// @brief This function wraps the erosion rate calculator, and returns 
+    ///  both the erosion rate as well as the uncertainties
+    /// @param Nuclide_conc Concetration of the nuclide
+    /// @param Nuclide a string denoting the name of the nuclide (at the moment
+    ///  options are 10Be and 26Al)
+    /// @param Nuclide_conc_err The instrument error in the nuclide concentration
+    /// @param prod_uncert_fracton This is a fraction of the total uncertainty
+    ///  for the production rates. It is a lumped parameter that can be used
+    ///  for just production, or for snow, topo and porduction uncertainty
+    /// @param Muon_scaling string that gives the muon scaling scheme
+    ///  options are Schaller, Granger and Braucher
+    /// @param snow_eff_depth the effective depth (in g/cm^2) of snow
+    /// @param self_eff_depth the effective depth (in g/cm^2) of self shielding
+    /// @param topo_shield the topographic shielding at this point
+    /// @param production the production rate of the nuclude at this point
+    /// @return  a vector of both the erosion rates and the uncertainties of the sample
+    /// @author SMM
+    /// @date 24/01/2016
+    vector<double> full_CRN_erosion_analysis_point(double Nuclide_conc, string Nuclide, 
+                            double Nuclide_conc_err, double prod_uncert_factor,
+                            string Muon_scaling, double snow_eff_depth,
+                            double self_eff_depth, double topo_shield,
+                            double production);
+
+    /// @brief this uses Newton Raphson iteration to retrieve the erosion rate
+    ///  from a basin given a nuclide concentration
+    /// @param eff_erosion rate The erosion rate in g/cm^2/yr
+    /// @param Nuclide a string with the nuclide name. At the moment the options are:
+    ///   Be10
+    ///   Al26
+    ///  These are case sensitive
+    /// @param prod_uncert_factor production uncertainty factor is a multiplier that sets the production 
+    ///  certainty. If it is 1.1, there is 10% production rate uncertainty, or
+    ///  if it is 0.9 there is -10% unvertainty. The reason why it is implemented
+    ///  like this is that this allows gaussian error propigation.
+    /// @param Muon_scaling a string that gives the muon scaling scheme. 
+    ///  options are Schaller, Braucher and Granger
+    /// @param production_uncertainty this gives the uncertainty in the production
+    ///  rates based on the production_uncert_factor; it is used in gaussian
+    ///  error propigation. The parameter is replaced within the function. 
+    /// @param average_production This gives the production rate average for the
+    ///  basin. It can be used for uncertainty analyis: if the scaling is
+    ///  changed the change in this production rate can be used to construct
+    ///  the gaussian error propigation terms   
+    /// @param is_production_uncertainty_plus_on a boolean that is true if the 
+    ///  production rate uncertainty (+) is switched on
+    /// @param is_production_uncertainty_minus_on a boolean that is true if the 
+    ///  production rate uncertainty (-) is switched on. If the + switch is 
+    ///  true this parameter defauts to false.         
+    /// @return The effective erosion rate in g/cm^-2/yr
+    /// @author SMM
+    /// @date 24/01/2016
+    double predict_CRN_erosion_point(double Nuclide_conc, string Nuclide, 
+                               double prod_uncert_factor,string Muon_scaling,
+                               double& production_uncertainty,
+                               double& average_production,
+                               bool is_production_uncertainty_plus_on,
+                               bool is_production_uncertainty_minus_on,
+                               double snow_eff_depth,
+                               double self_eff_depth, double topo_shield,
+                               double production);
+
+
+    /// @brief this predicts the mean concentration of a nuclide for a point location.
+    ///  It does a full analyitical solution to account for
+    ///  snow and self sheilding
+    /// @param eff_erosion rate The erosion rate in g/cm^2/yr
+    /// @param Nuclide a string with the nuclide name. At the moment the options are:
+    ///   Be10
+    ///   Al26
+    ///  These are case sensitive
+    /// @param prod_uncert_factor production uncertainty factor is a multiplier that sets the production 
+    ///  certainty. If it is 1.1, there is 10% production rate uncertainty, or
+    ///  if it is 0.9 there is -10% unvertainty. The reason why it is implemented
+    ///  like this is that this allows gaussian error propigation.
+    /// @param Muon_scaling a string that gives the muon scaling scheme. 
+    ///  options are Schaller, Braucher and Granger
+    /// @param data_from_outlet_only boolean that is true of you want 
+    ///  concentration calculated from the outlet only.
+    /// @param production_uncertainty this gives the uncertainty in the production
+    ///  rates based on the production_uncert_factor; it is used in gaussian
+    ///  error propigation. The parameter is replaced within the function.
+    /// @param is_production_uncertainty_plus_on a boolean that is true if the 
+    ///  production rate uncertainty (+) is switched on
+    /// @param is_production_uncertainty_minus_on a boolean that is true if the 
+    ///  production rate uncertainty (-) is switched on. If the + switch is 
+    ///  true this parameter defauts to false. 
+    /// @param snow_eff_depth the effective depth (in g/cm^2) of snow
+    /// @param self_eff_depth the effective depth (in g/cm^2) of self shielding
+    /// @param topo_shield the topographic shielding at this point
+    /// @param production the production rate of the nuclude at this point
+    /// @return the concentration of the nuclide averaged across the DEM
+    /// @author SMM
+    /// @date 24/01/2016
+    double predict_mean_CRN_conc_point(double eff_erosion_rate, string Nuclide,
+                                            double prod_uncert_factor, string Muon_scaling,
+                                            double& production_uncertainty, 
+                                            bool is_production_uncertainty_plus_on,
+                                            bool is_production_uncertainty_minus_on,
+                                            double snow_eff_depth,
+                                            double self_eff_depth,
+                                            double topo_shield,
+                                            double production);
+
+
 
     /// @brief This function wraps the cosmogenic rate calculators.
     /// @detail Looks throught the vecvecs listing file locations and then
@@ -265,6 +444,27 @@ class LSDCosmoData
     /// @date 23/03/2015
     void full_shielding_raster_printer(vector<string> Raster_names,
                                         vector<double> CRN_params);
+
+    /// @brief This function uses the COSMOCALC functions of LSDParticles to
+    ///  calculate the erosion rates from point measurements using pre-calculated
+    ///  vectors of shielding and scaling data
+    /// @param valid_samples a vector continaing the indices into the samples
+    ///  you want to use
+    /// @param snow_thickness a vector of snow thickness in g/cm^2 (or any surface shielding)
+    ///  that is the same size as valid_samples
+    /// @param self_thickness the self thickness in g/cm^2. For soil samples
+    ///  this can be the thickness of the sample. Same size as valid_samples
+    /// @param toposhield a vecor with the local topographic shielding
+    /// @param production_scaling a vector with the production scaling
+    /// @param muon_scaling a string with a valid scaling scheme name
+    /// @author SMM
+    /// @date 29/01/2016
+    void point_measurements(vector<int> valid_samples,vector<double> snow_thickness, 
+                                      vector<double> self_thickness,
+                                      vector<double> toposhield,
+                                      vector<double> production_scaling, 
+                                      string muon_scaling);
+
 
     /// @brief this function prints the data held in the the data members
     ///  to screen. Is used for bug checking. 
@@ -357,6 +557,22 @@ class LSDCosmoData
     /// @date 23/03/2015
     void print_rasters();
     
+    /// @brief This prints scaling, shielding production and other rasters
+    ///  for entire DEMs.  It only prints topo, snow and self shielding if those
+    ///  rasters exists. That is, it does not calculate toposhielding automatically.
+    /// @detail The printed rasters are:
+    ///  extension _PRES the atmospheric pressure in hPa, determined from the
+    ///  NCEP atmospheric pressure compilation following Balco et al 2008
+    ///  extension _PROD the production scaling, based on stone/lal
+    ///  extension _CSHIELD the combined sheilding, that is the combination of
+    ///  snow, self and topographic shielding. Snow and self shielding are
+    ///  approximated with spallation only production
+    ///  extension _CSCALE the product of the combined shielding and production
+    ///  for each pixel.
+    /// @author SMM
+    /// @date 15/02/2016
+    void print_scaling_and_shielding_complete_rasters();
+    
   protected:
     
     /// the number of samples
@@ -370,6 +586,21 @@ class LSDCosmoData
     
     /// A vector of the sample names
     vector<string> sample_name;
+    
+    /// A vector with the indices into the valid samples that have soil data
+    vector<int> soil_sample_index;
+    
+    /// this is an index that points from a sample to an entry in the soil
+    /// vectors
+    vector<int> has_soil_data_index;
+    
+    /// The top depth (in soil, in g/cm^2) of a soil sample
+    /// This vector is indexed into the other vectors with valid_soil_samples
+    vector<double> soil_top_effective_depth;
+    
+    /// The thickness (in g/cm^2) of a soil sample
+    /// This vector is indexed into the other vectors with valid_soil_samples
+    vector<double> soil_effective_thickness;
     
     /// a vector holding the latitude of the samples
     vector<double> latitude;

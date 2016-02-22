@@ -64,7 +64,9 @@
 #include "LSDJunctionNetwork.hpp"
 #include "LSDBasin.hpp"
 #include "LSDRasterInfo.hpp"
+#include "TNT/tnt.h"
 using namespace std;
+using namespace TNT;
 
 #ifndef LSDCosmoData_CPP
 #define LSDCosmoData_CPP
@@ -74,70 +76,61 @@ using namespace std;
 // The default create function. Doesn't do anything
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 void LSDCosmoData::create()
-{}
+{
+  Muon_scaling = "Braucher";
+}
 
 void LSDCosmoData::create(string path_name, string param_name_prefix)
 {
-  // flags for writing files
-  write_TopoShield_raster = true;
-  write_basin_index_raster = true;
+  cout << "I am loading an LSDCosmoData object" << endl;
+  cout << "Your pathname is: " << path_name << endl;
+  cout << "You parameter name prefix is: " << param_name_prefix << endl;
   
-  // set the names of the data members
-  path = path_name;
-  param_name = param_name_prefix;
-
-  // Set the parameters
-  // The default slope parameter for filling. Do not change. 
-  min_slope = 0.0001;
-  
-  // parameters for making stream networks and looking for channels
-  source_threshold = 12;
-  search_radius_nodes = 1;
-  threshold_stream_order = 1;
-
-  // the values of theta and phi step are based on testing by S. Grieve 
-  // Note that Codilian recommends 5,5 but 10,15 leads to minimal errors
-  theta_step = 30;
-  phi_step = 30;
-
-  // some environment variables
-  prod_uncert_factor = 1;          // this is a legacy parameter.
-  Muon_scaling = "Braucher";       // default muon scaling
-
-  // the atmospheric data is in the folder with the driver_functions
-  string path_to_atmospheric_data = "./";
-  
-  // a boundary condition for the flow info object
-  vector<string> boundary_conditionst(4);
-  boundary_conditionst[0] = "n";
-  boundary_conditionst[1] = "n";
-  boundary_conditionst[2] = "n";
-  boundary_conditionst[3] = "n";
-  boundary_conditions = boundary_conditionst;
-
   // remove control characters from these strings
   path_name.erase(remove_if(path_name.begin(), path_name.end(), ::iscntrl), path_name.end());
   param_name_prefix.erase(remove_if(param_name_prefix.begin(), param_name_prefix.end(), ::iscntrl), param_name_prefix.end());
   
   string combined_filename = path_name+param_name_prefix;
-  
-  // load the file that contains the path to both the cosmo data and the 
-  // DEMs
-  
+  cout << "The combined filename is: " << combined_filename << endl;
+
+  // set the names of the data members
+  path = path_name;
+  param_name = param_name_prefix;
+
   // set up extensions to the files
   string crn_ext = "_CRNData.csv";
   string files_ext = "_CRNRasters.csv";
   string csv_ext = "csv";
   string params_ext = ".CRNParam";
   string outfile_ext = ".CRNParamReport";
+  string soil_ext = "_CRNSoilInfo.csv";
   
   // get the filenames to open
   string crn_fname = path_name+param_name_prefix+crn_ext;
   string Rasters_fname =  path_name+param_name_prefix+files_ext;
   string parameters_fname = path_name+param_name_prefix+params_ext;
+  string soil_fname = path_name+param_name_prefix+soil_ext;
+
+  // check the parameter files
+  check_files(crn_fname,Rasters_fname,parameters_fname,soil_fname);
+  
+  //Muon_scaling = "Braucher";
+  //cout << "The muon scaling is empty at the moment. Here is what it is: " << endl;
+  //cout << Muon_scaling << endl;
+  //if(Muon_scaling.empty())
+  //{
+  //  cout << "You haven't defined the Muon scaling yet. " << endl;
+  //}
+  //else
+  //{
+  //  cout << "Muon scaling is: " << Muon_scaling << endl;
+  //}
+
+
+  // Initiate default parameters
+  initiate_default_parameters();
 
   // load the data. 
-  
   cout << "Loading CRN data" << endl;
   load_cosmogenic_data(crn_fname, csv_ext);
   
@@ -149,7 +142,6 @@ void LSDCosmoData::create(string path_name, string param_name_prefix)
   // set the map of scaling parameters with an empty map
   map< string, map<int,double> > empty_map;
   MapOfProdAndScaling = empty_map;
-
   
   cout << "Loading file structures" << endl;
   load_DEM_and_shielding_filenames_csv(Rasters_fname);
@@ -165,11 +157,79 @@ void LSDCosmoData::create(string path_name, string param_name_prefix)
   check_rasters();
   cout << "The rasters seem okay. Mmmm, rasters." << endl;
   
+  // see if there is additional soil information
+  cout << "Checking soil information from the file:" << soil_fname <<  endl;
+  load_soil_info(soil_fname);
+  
+  cout << "I'm all done loading the CRN data!" << endl;
+  cout << "=================================================" << endl << endl << endl;
+  
   // now print all the data into a report
   string outfile_name = path_name+param_name_prefix+outfile_ext;
   print_all_data_parameters_and_filestructures(outfile_name);
   
 }
+//==============================================================================
+
+
+//==============================================================================
+// This initiates default parameters in case they are not in the parameter file
+//==============================================================================
+void LSDCosmoData::initiate_default_parameters()
+{
+  cout << "I am initiating default parameters, these will be overwittern by the paramfile...";
+  // flags for writing files
+  write_TopoShield_raster = true;
+  write_basin_index_raster = true;
+  
+  // Set the parameters
+  // The default slope parameter for filling. Do not change. 
+  min_slope = 0.0001;
+  
+  //cout << "1" << endl;
+  
+  // parameters for making stream networks and looking for channels
+  source_threshold = 12;
+  search_radius_nodes = 1;
+  threshold_stream_order = 1;
+
+  // the values of theta and phi step are based on testing by S. Grieve 
+  // Note that Codilian recommends 5,5 but 10,15 leads to minimal errors
+  theta_step = 30;
+  phi_step = 30;
+
+  // some environment variables
+  prod_uncert_factor = 1;          // this is a legacy parameter.
+  
+
+  //cout << "Default theta and phi steps: " << theta_step << " " << phi_step << endl;
+
+  string test_scaling = "Braucher";
+  
+  //cout << "Test scaling is: " << test_scaling << endl;
+  //cout << "default production_uncer_factor: " <<   prod_uncert_factor << endl;
+  
+  Muon_scaling = test_scaling;       // default muon scaling
+
+  //cout << "default muon scaling: " << Muon_scaling << endl;
+
+  // the atmospheric data is in the folder with the driver_functions
+  string path_to_atmospheric_data = "./";
+  
+  //cout << "default path_to_atmospheric_data: " << path_to_atmospheric_data  << endl;
+  
+  // a boundary condition for the flow info object
+  vector<string> boundary_conditionst(4);
+  boundary_conditionst[0] = "n";
+  boundary_conditionst[1] = "n";
+  boundary_conditionst[2] = "n";
+  boundary_conditionst[3] = "n";
+  boundary_conditions = boundary_conditionst;
+  
+  cout << "done." << endl;
+  
+}
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // The create function that actually loads the file
@@ -419,6 +479,154 @@ void LSDCosmoData::load_csv_cosmo_data(string filename)
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This loads information from a soil file
+// The file contains several columns:
+// sampleID,sample_top_depth,sample_bottom_depth,density
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDCosmoData::load_soil_info(string filename)
+{
+
+  // initiate temporary vectors
+  vector<string> temp_sample_name;
+  vector<double> temp_top_depth;
+  vector<double> temp_sample_thickness;
+  vector<double> temp_density;
+  vector<int> temp_has_soil_data_index(N_samples,-1);
+
+  vector<int> valid_soil_samples;
+  vector<double> valid_top_eff_depth;
+  vector<double> valid_sample_eff_thickness;
+  double this_top_eff_depth;
+  double this_eff_thick;
+  
+  // initiate the string to hold the file
+  string line_from_file;
+  vector<string> empty_string_vec;
+  vector<string> this_string_vec;
+  string temp_string;
+
+  // make sure the filename works
+  ifstream ifs(filename.c_str());
+  if( ifs.fail() )
+  {
+    cout << "\nThere isn't any soil information. If you think there should be, check your filename." << endl;
+    cout << "You looked for: " << filename << endl;
+  }
+  else
+  {
+    // discard the first line
+    getline(ifs, line_from_file);
+  
+    // now loop through the rest of the lines, getting the data. 
+    while( getline(ifs, line_from_file))
+    {
+      // reset the string vec
+      this_string_vec = empty_string_vec;
+    
+      // create a stringstream
+      stringstream ss(line_from_file);
+    
+      while( ss.good() )
+      {
+        string substr;
+        getline( ss, substr, ',' );
+      
+        // remove the spaces
+        substr.erase(remove_if(substr.begin(), substr.end(), ::isspace), substr.end());
+      
+        // remove control characters
+        substr.erase(remove_if(substr.begin(), substr.end(), ::iscntrl), substr.end());
+      
+        // add the string to the string vec
+        this_string_vec.push_back( substr );
+      }
+    
+      //cout << "Yoyoma! size of the string vec: " <<  this_string_vec.size() << endl;
+      if ( int(this_string_vec.size()) < 4)
+      {
+        cout << "Hey there, I am trying to load your soil data but you seem not to have" << endl;
+        cout << "enough columns in your file. I am ignoring a line" << endl;
+      }
+      else
+      {
+        // now convert the data
+        //cout << "Getting sample name: " <<  this_string_vec[0] << endl;
+      
+        // let the user know about offending underscores, and replace them
+        string s = this_string_vec[0];
+        string uscore = "_";
+        size_t found = s.find(uscore);
+        if (found!=std::string::npos)
+        {
+          cout << "I found an underscore in the sample name. Replacing with a dash." <<endl;
+          replace( s.begin(), s.end(), '_', '-');
+          cout << "New sample name is: " << s << endl;
+        }
+
+        temp_sample_name.push_back( s );
+        temp_top_depth.push_back( atof( this_string_vec[1].c_str() ) );
+        temp_sample_thickness.push_back( atof(this_string_vec[2].c_str() ) );
+        temp_density.push_back( atof( this_string_vec[3].c_str() ) );
+      }  
+    }
+    
+
+    int n_soil_samples = int(temp_sample_name.size());
+    // now you need to check if the soil samples match up with and recorded samples
+    int soil_sample_counter = 0;
+    for (int i = 0; i< n_soil_samples; i++)
+    {
+      //cout << "I have a soil sample named " << temp_sample_name[i] 
+      //     << " and I'm trying to find it in the sample list" << endl;
+    
+      for (int samp = 0; samp < N_samples; samp++)
+      {
+        
+        if(sample_name[samp] == temp_sample_name[i])
+        {
+          cout << "You found a valid sample: " << sample_name[samp] << endl;
+          valid_soil_samples.push_back(samp);
+          
+          // calculate the effective depths and thicknesses
+          // effective depths are in g/cm^2
+          // these assume that the density is in kg/m^3 and the
+          // thicknesses are in cm
+          this_top_eff_depth = temp_density[i]*temp_top_depth[i]*0.001;
+          valid_top_eff_depth.push_back( this_top_eff_depth );
+          
+          this_eff_thick = temp_density[i]*temp_sample_thickness[i]*0.001;
+          valid_sample_eff_thickness.push_back(this_eff_thick);
+          
+          
+          cout << "This effective depth is: " << this_top_eff_depth << endl;
+          cout << "The eff thickness is: " <<  this_eff_thick << endl;
+          
+          // have and index that points from the CRN sample to the vectors
+          // of soil data
+          temp_has_soil_data_index[samp] = soil_sample_counter;
+          soil_sample_counter++;
+        }
+        else
+        {
+          //cout << "No, this sample is called: " << sample_name[samp] << endl;
+        }
+      }
+    }
+
+    // now update the data members
+    soil_sample_index = valid_soil_samples;
+    soil_top_effective_depth = valid_top_eff_depth;
+    soil_effective_thickness = valid_sample_eff_thickness;
+    
+  }
+  
+  has_soil_data_index = temp_has_soil_data_index; 
+  
+  cout << "The number of samples is: " << soil_sample_index.size() << " "
+       << soil_top_effective_depth.size() << " " <<  soil_effective_thickness.size() << endl;
+  
+}
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This function loads parameters
@@ -497,6 +705,11 @@ void LSDCosmoData::load_parameters(string filename)
       {
         Muon_scaling = "Schaller";
         cout << "You have selected Schaller scaling" << endl;
+      }
+      else if(value.find("newCRONUS") == 0 || value.find("newCRONUS") == 0)
+      {
+        Muon_scaling = "newCRONUS";
+        cout << "You have selected the new CRONUS scaling" << endl;
       }
       else
       {
@@ -735,7 +948,7 @@ void LSDCosmoData::load_DEM_and_shielding_filenames_csv(string filename)
   
   // just check if there are no empty entries (thanks to hidden newline characters)
   bool back_is_not_okay = 1;
-  cout << "HEY FAT ALBERT" << endl;
+  //cout << "HEY FAT ALBERT" << endl;
   while(back_is_not_okay)
   {
     int NDEMS = int(temp_DEM_names_vecvec.size());
@@ -744,6 +957,7 @@ void LSDCosmoData::load_DEM_and_shielding_filenames_csv(string filename)
     if(last_DEM_name == "")
     {
       cout << "Oh, BUGGER, who put a bunch of empty lines at the back of this file!" << endl;
+      cout << "Microsoft is probably to blame if you opened in excel." << endl;
       cout << "I'm getting rid of this one." <<endl;
       temp_DEM_names_vecvec.pop_back();
     }
@@ -840,6 +1054,70 @@ void LSDCosmoData::load_txt_cosmo_data(string filename)
   
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This checks to see if all the files exist
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDCosmoData::check_files(string crn_fname,string Rasters_fname,string parameters_fname,
+                               string soil_fname)
+{
+  cout << "=======================================================" << endl;
+  cout << "I am checking on your files to see if they exist." << endl;
+  // make sure the filename works
+  ifstream ifsc(crn_fname.c_str());
+  if( ifsc.fail() )
+  {
+    cout << "FATAL ERROR: The crn file: " << crn_fname
+         << "doesn't exist" << endl;
+    exit(EXIT_FAILURE);
+  }
+  else
+  {
+    cout << "The CRN file exists." << endl;
+  }
+
+  // make sure the filename works
+  ifstream ifsr(Rasters_fname.c_str());
+  if( ifsr.fail() )
+  {
+    cout << "FATAL ERROR: The rasters file: " << Rasters_fname
+         << "doesn't exist" << endl;
+    exit(EXIT_FAILURE);
+  }
+  else
+  {
+    cout << "The Rasters file exists." << endl;
+  }
+  
+  // make sure the filename works
+  ifstream ifsp(parameters_fname.c_str());
+  if( ifsp.fail() )
+  {
+    cout << "FATAL ERROR: The parameter file: " << parameters_fname
+         << "doesn't exist" << endl;
+    exit(EXIT_FAILURE);
+  }
+  else
+  {
+    cout << "The parameter file exists." << endl;
+  }
+  
+  // make sure the filename works
+  ifstream ifss(soil_fname.c_str());
+  if( ifss.fail() )
+  {
+    cout << "WARNING: The soil file: " << soil_fname
+         << "doesn't exist." << endl
+         << "This is fine as long as you are not doing soil analysis." << endl;
+  }
+  else
+  {
+    cout << "There is a soil file." << endl;
+  }
+  cout << "=====================================================" << endl;    
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -956,7 +1234,7 @@ void LSDCosmoData::check_parameter_values()
   }
   
   if (Muon_scaling != "Braucher" && Muon_scaling != "Granger" && 
-      Muon_scaling != "Schaller")
+      Muon_scaling != "Schaller" && Muon_scaling != "newCRONUS")
   {
     cout << "You have not seleceted a valid scaling. Defaulting to Braucher" << endl;
     Muon_scaling = "Braucher";
@@ -1479,6 +1757,73 @@ void LSDCosmoData::RunShielding(string path, string prefix)
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function prints a production raster for a basin
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDRaster LSDCosmoData::calculate_production_raster(LSDRaster& Elevation_Data,
+                                               string path_to_atmospheric_data)
+{
+  int NRows = Elevation_Data.get_NRows();
+  int NCols = Elevation_Data.get_NCols();
+  float NDV =  Elevation_Data.get_NoDataValue();
+  
+  Array2D<float> Production(NRows,NCols,NDV);
+
+  // variables for converting location and elevation
+  double this_elevation, this_pressure;
+
+  // now create the CRN parameters object
+  LSDCRNParameters LSDCRNP;
+  
+  // get the atmospheric parameters
+  LSDCRNP.load_parameters_for_atmospheric_scaling(path_to_atmospheric_data);
+  LSDCRNP.set_CRONUS_data_maps();
+  
+  // a function for scaling stone production, defaults to 1
+  double Fsp = 1.0;
+  
+  // the latitude and longitude
+  double lat,longitude;
+  
+  // decalre converter object
+  LSDCoordinateConverterLLandUTM Converter;
+  
+  for (int row = 0; row < NRows; row++)
+  {
+    for(int col = 0; col<NCols; col++)
+    {
+      
+      //exclude NDV from average
+      if (Elevation_Data.get_data_element(row,col) != NDV)
+      {
+        // To get pressure, first get the lat and long
+        Elevation_Data.get_lat_and_long_locations(row, col, lat, longitude, Converter);
+        //Elevation_Data.get_lat_and_long_locations(row, col, lat, longitude);
+      
+        // now the elevation
+        this_elevation = Elevation_Data.get_data_element(row,col);
+      
+        // now the pressure
+        this_pressure = LSDCRNP.NCEPatm_2(double(lat), double(longitude), 
+                                        double(this_elevation));
+
+        // get the production
+        Production[row][col] = LSDCRNP.stone2000sp(lat,this_pressure, Fsp);
+      }
+    }
+  }
+
+  float XMinimum = Elevation_Data.get_XMinimum();
+  float YMinimum = Elevation_Data.get_YMinimum();
+  float DataResolution = Elevation_Data.get_DataResolution();
+  map<string,string> GeoReferencingStrings = Elevation_Data.get_GeoReferencingStrings();
+
+  LSDRaster Production_raster(NRows, NCols, XMinimum, YMinimum, DataResolution,
+                               NDV, Production,GeoReferencingStrings);
+  return Production_raster;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
@@ -1923,8 +2268,9 @@ void LSDCosmoData::basic_cosmogenic_analysis(string DEM_fname)
 // THIS IS FOR A SINGLE RASTER
 // 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-void LSDCosmoData::full_shielding_cosmogenic_analysis(vector<string> Raster_names,
-                            vector<double> CRN_params)
+void LSDCosmoData::full_shielding_cosmogenic_analysis_nested(vector<string> Raster_names,
+                            vector<double> CRN_params, 
+                            LSDRaster& known_eff_erosion)
 {
 
   cout << endl << endl << "================================================" << endl;
@@ -1949,6 +2295,17 @@ void LSDCosmoData::full_shielding_cosmogenic_analysis(vector<string> Raster_name
   string DEM_fname = Raster_names[0];
   //cout << "Loading raster: " << DEM_fname << endl;
   LSDRaster topo_test(DEM_fname, DEM_bil_extension);
+  topo_test.remove_seas();
+  
+  // check to see if the rasters are the same
+  LSDRasterInfo DEM_info(topo_test);
+  LSDRasterInfo Erosion_info(known_eff_erosion);
+  if (DEM_info != Erosion_info)
+  {
+    cout << "LSDCosmoData::full_shielding_cosmogenic_analysis_nested ERROR!" << endl;
+    cout << "The erosion raster and DEM are not the same dimesions." <<endl;
+    exit(EXIT_SUCCESS);
+  }
   
   // Fill this raster
   LSDRaster filled_raster = topo_test.fill(min_slope);
@@ -2177,7 +2534,7 @@ void LSDCosmoData::full_shielding_cosmogenic_analysis(vector<string> Raster_name
         }
         else
         {
-          cout << "No snow raster, but I'm getting the effective depths" << endl;
+          cout << "No self raster, but I'm getting the effective depths" << endl;
           cout << "The constant self depth is: " <<  constant_self_depth << endl;
           thisBasin.populate_snow_and_self_eff_depth_vectors(FlowInfo, 
                                 Snow_shielding, constant_self_depth);
@@ -2208,6 +2565,363 @@ void LSDCosmoData::full_shielding_cosmogenic_analysis(vector<string> Raster_name
       thisBasin.populate_scaling_vectors(FlowInfo, filled_raster, 
                                          Topographic_shielding,
                                          path_to_atmospheric_data);
+      cout << "The scaling vectors are populated. I am moving on to the analysis" << endl;
+
+      // now do the analysis
+      vector<double> erate_analysis = thisBasin.full_CRN_erosion_analysis_nested(known_eff_erosion, FlowInfo, test_N, 
+                                          valid_nuclide_names[samp], test_dN, 
+                                          prod_uncert_factor, Muon_scaling);
+
+      cout << "Line 2205, doing analysis" << endl;
+    
+    
+      // now get parameters for cosmogenic calculators
+      vector<double> param_for_calc = 
+          thisBasin.calculate_effective_pressures_for_calculators_nested(filled_raster,
+                                            FlowInfo, path_to_atmospheric_data, 
+                                            known_eff_erosion);
+
+      cout << "Paramforcalc size: " << param_for_calc.size() << endl;              
+      cout << "Getting pressures" << endl;
+
+
+      // get the relief of the basin
+      float R = thisBasin.CalculateBasinRange(FlowInfo, filled_raster);
+      double relief = double(R);
+
+      MapOfProdAndScaling["BasinRelief"][ valid_cosmo_points[samp] ] = relief;
+      MapOfProdAndScaling["AverageProdScaling"][ valid_cosmo_points[samp] ] = param_for_calc[0];
+      MapOfProdAndScaling["AverageTopoShielding"][ valid_cosmo_points[samp] ] = param_for_calc[1];
+      MapOfProdAndScaling["AverageSelfShielding"][ valid_cosmo_points[samp] ] = param_for_calc[2];
+      MapOfProdAndScaling["AverageSnowShielding"][ valid_cosmo_points[samp] ] = param_for_calc[3];
+      MapOfProdAndScaling["AverageShielding"][ valid_cosmo_points[samp] ] =  param_for_calc[11];
+      MapOfProdAndScaling["AverageCombinedScaling"][ valid_cosmo_points[samp] ] = param_for_calc[4];
+      MapOfProdAndScaling["outlet_lat"][ valid_cosmo_points[samp] ] = param_for_calc[5];
+      MapOfProdAndScaling["OutletPressure"][ valid_cosmo_points[samp] ] = param_for_calc[6];
+      MapOfProdAndScaling["OutletEffectivePressure"][ valid_cosmo_points[samp] ] = param_for_calc[7];
+      MapOfProdAndScaling["centroid_lat"][ valid_cosmo_points[samp] ] = param_for_calc[8];
+      MapOfProdAndScaling["CentroidPressure"][ valid_cosmo_points[samp] ] = param_for_calc[9];
+      MapOfProdAndScaling["CentroidEffectivePressure"][ valid_cosmo_points[samp] ] = param_for_calc[10];
+    
+      // add the erosion rate results to the holding data member
+      erosion_rate_results[ valid_cosmo_points[samp] ] = erate_analysis;
+
+      //cout << "finished adding data" << endl;
+
+    }  // finished looping thorough basins
+    
+    // now print the basin LSDIndexRaster
+    if(write_basin_index_raster)
+    {
+      string basin_ext = "_BASINS";
+      string basin_fname =  DEM_fname+basin_ext;
+      BasinIndex.write_raster(basin_fname, DEM_bil_extension);
+    }
+     
+  }    // finsiehd logic for a DEM with valid points
+  else
+  {
+    cout << "There are no valid CRN points in this raster" << endl;
+  }
+  cout << "==========================================" << endl << endl;
+
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// This function wraps the determination of cosmogenic erosion rates
+// THIS IS FOR A SINGLE RASTER
+// 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDCosmoData::full_shielding_cosmogenic_analysis(vector<string> Raster_names,
+                            vector<double> CRN_params)
+{
+
+  cout << endl << endl << "================================================" << endl;
+  cout << "Looking for basins in raster: " << Raster_names[0] << endl << endl;
+
+  // some parameters for printing the basins, if that is called for
+  int basin_number;
+  int basin_pixel_area;
+  map<int,int> basin_area_map;
+
+  //cout << "\n\n\n====================================================\n";
+  //cout << "Performing analysis with snow and self shielding" << endl;
+
+  // now find valid points
+  vector<int> valid_cosmo_points;         // a vector to hold the valid nodes
+  vector<int> snapped_node_indices;       // a vector to hold the valid node indices
+  vector<int> snapped_junction_indices;   // a vector to hold the valid junction indices
+  
+  // Load the DEM
+  string DEM_bil_extension = "bil";
+  //string fill_ext = "_fill";
+  string DEM_fname = Raster_names[0];
+  //cout << "Loading raster: " << DEM_fname << endl;
+  LSDRaster topo_test(DEM_fname, DEM_bil_extension);
+  topo_test.remove_seas();
+  
+  // Fill this raster
+  LSDRaster filled_raster = topo_test.fill(min_slope);
+  //cout << "Filled raster" << endl;
+  
+  // get the flow info
+  LSDFlowInfo FlowInfo(boundary_conditions, filled_raster);
+  //cout << "Got flow info" << endl;
+
+  // get contributing pixels (needed for junction network)
+  LSDIndexRaster ContributingPixels = FlowInfo.write_NContributingNodes_to_LSDIndexRaster();
+  //cout << "Got contributing pixels" << endl;
+  
+  // get the sources
+  vector<int> sources;
+  sources = FlowInfo.get_sources_index_threshold(ContributingPixels, source_threshold);
+  //cout << "Got sources" << endl;
+
+  // now get the junction network
+  LSDJunctionNetwork JNetwork(sources, FlowInfo);
+  //cout << "Got junction network" << endl;
+  
+  // Now convert the data into this UTM zone
+  convert_to_UTM(filled_raster);
+
+  // convert UTM vectors to float
+  vector<float> fUTM_easting;
+  vector<float> fUTM_northing;
+  for (int i = 0; i< int(UTM_easting.size()); i++)
+  {
+    fUTM_easting.push_back( float(UTM_easting[i]));
+    fUTM_northing.push_back( float(UTM_northing[i]));
+  }
+  
+  cout << "Getting snapped basins" << endl;
+  JNetwork.snap_point_locations_to_channels(fUTM_easting, fUTM_northing, 
+            search_radius_nodes, threshold_stream_order, FlowInfo, 
+            valid_cosmo_points, snapped_node_indices, snapped_junction_indices);
+  cout << "Snapped points" << endl;
+  
+  
+  // after this operation the three int vectors valid_cosmo_points, snapped_node_indices,
+  // and snapped_junction_indices should be populated with valid points
+  // you now need to get the concentrations and uncertainties from these
+  // points
+  
+  // first, get the data elements from the object
+  vector<string> valid_nuclide_names;
+  vector<double> valid_concentrations;
+  vector<double> valid_concentration_uncertainties;
+  
+  int n_valid_points = int(valid_cosmo_points.size());
+  for (int i = 0; i< int(n_valid_points); i++)
+  {
+    valid_nuclide_names.push_back(nuclide[ valid_cosmo_points[i] ] );
+    valid_concentrations.push_back( Concentration[ valid_cosmo_points[i] ] );
+    valid_concentration_uncertainties.push_back( 
+                          Concentration_uncertainty[ valid_cosmo_points[i] ] );
+  }
+  cout << "Got valid points, there are " << n_valid_points << " of them." << endl;
+  
+  
+  // Initiate pointers to the rasters
+  LSDRaster Topographic_shielding;
+  LSDRaster Snow_shielding;
+  LSDRaster Self_shielding;
+  
+  
+  // a flag for writing the initial basin index
+  bool written_inital_basin_index = false;
+  
+  // now, IF there are valid points, go on to the rest of the analysis
+  if (valid_nuclide_names.size() != 0)
+  {
+    // if you need to write the inital raster, do so 
+    LSDIndexRaster BasinIndex;   // initiate and empty raster
+
+    
+    // first check if topographic shielding raster exists
+    cout << "Looking for toposhield raster, name is: " << Raster_names[3] << endl;
+    if( Raster_names[3] != "NULL")
+    {
+      LSDRaster T_shield(Raster_names[3], DEM_bil_extension);
+      Topographic_shielding = T_shield;
+    }
+    else
+    {
+      // get the topographic shielding
+      cout << "Starting topographic shielding" << endl;
+      LSDRaster T_shield = filled_raster.TopographicShielding(theta_step, phi_step);
+      Topographic_shielding = T_shield;
+      
+      if(write_TopoShield_raster)
+      {
+        string TShield_name = Raster_names[0]+"_SH";
+        T_shield.write_raster(TShield_name,DEM_bil_extension);
+      }
+      
+    }
+    
+    // Now check if snow and self shielding rasters exist
+    bool have_snow_raster;
+    bool have_self_raster;
+    double constant_snow_depth = 0;
+    double constant_self_depth = 0;
+    if (Raster_names[1] != "NULL")
+    {
+      cout << "LSDCosmoData, line 2058: Loading the snow shielding raster, " 
+           << Raster_names[1] << ".bil" <<  endl;
+      LSDRaster Snow_shield(Raster_names[1], DEM_bil_extension);
+      Snow_shielding = Snow_shield;
+      have_snow_raster = true;
+    }
+    else
+    {
+      // snow shielding with a single parameter
+      have_snow_raster = false;
+      constant_snow_depth = CRN_params[0];
+    }
+    if (Raster_names[2] != "NULL")
+     {
+      cout << "LSDCosmoData, line 977: Loading the self shielding raster, " 
+           << Raster_names[2] << ".bil" <<  endl;
+      LSDRaster Self_shield(Raster_names[2], DEM_bil_extension);
+      Self_shielding = Self_shield;
+      have_self_raster = true;
+    }
+    else
+    {
+      // self shielding with a single parameter
+      have_self_raster = false;
+      constant_self_depth = CRN_params[1];
+    }
+
+    // some temporary doubles to hold the nuclide concentrations
+    double test_N10, test_dN10;   // concetration and uncertainty of 10Be in basin
+    double test_N26, test_dN26;   // concetration and uncertainty of 26Al in basin
+    double test_N, test_dN;       // concentration and uncertainty of the nuclide in basin  
+
+    //========================
+    // LOOPING THROUGH BASINS
+    //========================
+    // now loop through the valid points, getting the cosmo data 
+    cout << "-----------------------------------------------------------" << endl;
+    cout << "I found " << n_valid_points << " valid CRN basins in this raster! " << endl;
+    for(int samp = 0; samp<n_valid_points; samp++)
+    {
+      if( valid_nuclide_names[samp] == "Be10")
+      {
+        test_N10 = valid_concentrations[samp];
+        test_dN10 = valid_concentration_uncertainties[samp];
+        test_N26 = 1e9;
+        test_dN26 = 0;
+        test_N = test_N10;
+        test_dN = test_dN10;
+      }
+      else if( valid_nuclide_names[samp] == "Al26")
+      {
+        test_N10 = 1e9;
+        test_dN10 = 0;
+        test_N26 = valid_concentrations[samp];
+        test_dN26 = valid_concentration_uncertainties[samp];
+        test_N = test_N26;
+        test_dN = test_dN26;
+      }
+      else
+      {
+        cout << "You did not select a valid nuclide name, options are Be10 and Al26" << endl;
+        cout << "Defaulting to Be10" << endl;
+        valid_nuclide_names[samp] = "Be10";
+        test_N10 = valid_concentrations[samp];
+        test_dN10 = valid_concentration_uncertainties[samp];
+        test_N26 = 1e9;
+        test_dN26 = 0;
+        test_N = test_N10;
+        test_dN = test_dN10;
+      }
+      
+
+      cout << endl << "Valid point is: " << valid_cosmo_points[samp]
+           << " Sample name: " << sample_name[ valid_cosmo_points[samp] ] << " Easting: " 
+           << UTM_easting[valid_cosmo_points[samp]] << " Northing: "
+           << UTM_northing[valid_cosmo_points[samp]] << endl;
+      cout << "Node index is: " <<  snapped_node_indices[samp] << " and junction is: " 
+           << snapped_junction_indices[samp] << endl;
+      cout << "-  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -" << endl;
+      LSDCosmoBasin thisBasin(snapped_junction_indices[samp],FlowInfo, JNetwork,
+                              test_N10,test_dN10, test_N26,test_dN26);
+
+      // write the index basin if flag is set to true
+      if(write_basin_index_raster)
+      {
+        cout << "I'm writing a basin index number for you" << endl;
+      
+        if (not written_inital_basin_index)
+        {
+        
+          basin_number = valid_cosmo_points[samp];
+          basin_pixel_area = thisBasin.get_NumberOfCells();
+          basin_area_map[basin_number] = basin_pixel_area;
+          LSDIndexRaster NewBasinIndex = 
+             thisBasin.write_integer_data_to_LSDIndexRaster(basin_number, FlowInfo);
+          BasinIndex = NewBasinIndex;
+          written_inital_basin_index = true;
+        }
+        else
+        {
+          basin_number = valid_cosmo_points[samp];
+          thisBasin.add_basin_to_LSDIndexRaster(BasinIndex, FlowInfo,
+                                                basin_area_map,basin_number);
+        }
+      }
+
+      // we need to scale the shielding parameters
+      // now do the snow and self shielding
+      if (have_snow_raster)
+      {
+        cout << "I've got the snow raster" << endl;
+      
+        if(have_self_raster)
+        {
+          cout << "I've also got the self raster." << endl;
+          thisBasin.populate_snow_and_self_eff_depth_vectors(FlowInfo, 
+                                Snow_shielding, Self_shielding);
+          cout << "Done with effective depths" << endl;                           
+        }
+        else
+        {
+          cout << "No self raster, but I'm getting the effective depths" << endl;
+          cout << "The constant self depth is: " <<  constant_self_depth << endl;
+          thisBasin.populate_snow_and_self_eff_depth_vectors(FlowInfo, 
+                                Snow_shielding, constant_self_depth);
+          cout << "Done with effective depths" << endl;        
+        }
+      }
+      else
+      {
+        if(have_self_raster)
+        {
+          cout << "Getting effective depths" << endl;
+          thisBasin.populate_snow_and_self_eff_depth_vectors(FlowInfo, 
+                                constant_snow_depth, Self_shielding);
+          cout << "Done with effective depths" << endl;                                
+        }
+        else
+        {
+          cout << "Getting effective depths" << endl;
+          thisBasin.populate_snow_and_self_eff_depth_vectors(constant_snow_depth, 
+                                             constant_self_depth);
+          cout << "Done with effective depths" << endl;                                 
+        }
+      }
+
+
+      cout << "Now I will populate the scaling vectors." << endl;
+      // Now topographic shielding and production scaling
+      thisBasin.populate_scaling_vectors(FlowInfo, filled_raster, 
+                                         Topographic_shielding,
+                                         path_to_atmospheric_data);
+      cout << "Done populating the scaling vectors. " << endl;
 
       // now do the analysis
       vector<double> erate_analysis = thisBasin.full_CRN_erosion_analysis(test_N, 
@@ -2268,6 +2982,8 @@ void LSDCosmoData::full_shielding_cosmogenic_analysis(vector<string> Raster_name
 
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -2344,6 +3060,7 @@ void LSDCosmoData::full_shielding_cosmogenic_analysis_for_spawned(vector<string>
   string DEM_fname = Raster_names[0];
   cout << "Loading raster: " << DEM_fname << endl;
   LSDRaster topo_test(DEM_fname, DEM_bil_extension);
+  topo_test.remove_seas();
   
   // Fill this raster
   LSDRaster filled_raster = topo_test.fill(min_slope);
@@ -2561,6 +3278,8 @@ void LSDCosmoData::full_shielding_cosmogenic_analysis_for_spawned(vector<string>
       cout << "Node index is: " <<  snapped_node_indices[samp] << " and junction is: " 
            << snapped_junction_indices[samp] << endl;
       cout << "-  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -" << endl;
+      
+      // extract the basin
       LSDCosmoBasin thisBasin(snapped_junction_indices[samp],FlowInfo, JNetwork,
                               test_N10,test_dN10, test_N26,test_dN26);
 
@@ -2586,8 +3305,8 @@ void LSDCosmoData::full_shielding_cosmogenic_analysis_for_spawned(vector<string>
         }
       }
 
-      // we need to scale the sheilding parameters
-      // now do the snow and self sheilding
+      // we need to scale the shielding parameters
+      // now do the snow and self shielding
       if (have_snow_raster)
       {
         if(have_self_raster)
@@ -2628,7 +3347,7 @@ void LSDCosmoData::full_shielding_cosmogenic_analysis_for_spawned(vector<string>
                                          Topographic_shielding,
                                          path_to_atmospheric_data);
 
-      // now do the analysis
+      // GET THE EROSION RATES
       vector<double> erate_analysis = thisBasin.full_CRN_erosion_analysis(test_N, 
                                           valid_nuclide_names[samp], test_dN, 
                                           prod_uncert_factor, Muon_scaling);
@@ -2690,6 +3409,971 @@ void LSDCosmoData::full_shielding_cosmogenic_analysis_for_spawned(vector<string>
   }
   cout << "==========================================" << endl << endl;
 
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function gets the erosion rate from a soil sample.
+// IMPORTANT: it assumes that there is no sediment transport from upslope!
+// This is most appropriate for ridgetops or from samples at the soil-saprolite bondary
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDCosmoData::Soil_sample_calculator(vector<string> Raster_names,
+                            vector<double> CRN_params)
+{
+
+  // Load the DEM
+  string DEM_bil_extension = "bil";
+  //string fill_ext = "_fill";
+  string DEM_fname = Raster_names[0];
+  cout << "Loading raster: " << DEM_fname << endl;
+  LSDRaster topo_test(DEM_fname, DEM_bil_extension);
+  cout << "Loaded the raster" << endl;
+  
+  // Some vectors to hold the valid node
+  // We need vectors rather than ints because the functions that are called
+  // during this routine expect vectors
+  vector<int> valid_cosmo_points;         // a vector to hold the valid nodes
+  vector<int> snapped_row;       // a vector to hold the valid rows
+  vector<int> snapped_col;   // a vector to hold the valid columns
+  vector<double> snapped_lat;
+  vector<double> snapped_long;
+  
+  // convert UTM vectors to float
+  // Again, we only pass one value to these vectors, since that is needed by the 
+  // snap to points fuction
+  convert_to_UTM(topo_test);
+  
+  vector<float> fUTM_easting;
+  vector<float> fUTM_northing;
+  for (int i= 0; i<N_samples; i++)
+  {
+    //cout << "East:" << UTM_easting[i]<< " and north: " << UTM_northing[i] << endl;
+    fUTM_easting.push_back( float(UTM_easting[i]));
+    fUTM_northing.push_back( float(UTM_northing[i]));
+  }
+
+  cout << "Got point locations" << endl;
+  // now see if the point is in the raster
+  float X_coordinate,Y_coordinate;
+  for (int i = 0; i< N_samples; i++)
+  {
+    X_coordinate = fUTM_easting[i];
+    Y_coordinate = fUTM_northing[i];
+    
+    // if it is in the raster, record it
+    if(topo_test.check_if_point_is_in_raster(X_coordinate,Y_coordinate))
+    {
+      valid_cosmo_points.push_back(i);
+      
+      // get the row and column
+      int this_row,this_col;
+      topo_test.get_row_and_col_of_a_point(X_coordinate,Y_coordinate,this_row, this_col);
+      snapped_row.push_back(this_row);
+      snapped_col.push_back(this_col);
+      snapped_lat.push_back( latitude[i] );
+      snapped_long.push_back( longitude[i] );
+      
+      cout << "X: " << X_coordinate << " Y: " << Y_coordinate << " R:" << this_row << " C: " << this_col << endl;
+    
+    }
+  }
+
+  // after this operation the three int vectors valid_cosmo_points, snapped_node_indices,
+  // and snapped_junction_indices should be populated with valid points
+  // you now need to get the concentrations and uncertainties from these
+  // points
+  
+  // first, get the data elements from the object
+  vector<string> valid_nuclide_names;
+  vector<double> valid_concentrations;
+  vector<double> valid_concentration_uncertainties;
+  
+  int n_valid_points = int(valid_cosmo_points.size());
+  for (int i = 0; i< int(n_valid_points); i++)
+  {
+    valid_nuclide_names.push_back(nuclide[ valid_cosmo_points[i] ] );
+    valid_concentrations.push_back( Concentration[ valid_cosmo_points[i] ] );
+    valid_concentration_uncertainties.push_back( 
+                          Concentration_uncertainty[ valid_cosmo_points[i] ] );
+  }
+  cout << "Got valid points, there are " << n_valid_points << " of them." << endl;
+  
+  // now the data elements that will be populated with the scaling and shielding 
+  // information
+  vector<double> snow_eff_depth_vec;
+  vector<double> self_eff_depth_vec;
+  vector<double> topo_shield_vec;
+  vector<double> production_vec;
+  vector<double> pressure_vec;
+
+  // Initiate pointers to the rasters
+  LSDRaster Topographic_shielding;
+  LSDRaster Snow_shielding;
+  LSDRaster Self_shielding;
+    
+
+  // now see if there are self and snow rasters, and extract values from them if there are
+  if (snapped_row.size()!=0)
+  {
+
+    // first check if topographic shielding raster exists
+    cout << "Looking for toposhield raster, name is: " << Raster_names[3] << endl;
+    if( Raster_names[3] != "NULL")
+    {
+      LSDRaster T_shield(Raster_names[3], DEM_bil_extension);
+      Topographic_shielding = T_shield;
+    }
+    else
+    {
+      // get the topographic shielding
+      cout << "Starting topographic shielding" << endl;
+      topo_test.remove_seas();
+      
+      
+      LSDRaster T_shield = topo_test.TopographicShielding(theta_step, phi_step);
+      Topographic_shielding = T_shield;
+        
+      if(write_TopoShield_raster)
+      {
+        string TShield_name = Raster_names[0]+"_SH";
+        T_shield.write_raster(TShield_name,DEM_bil_extension);
+      }
+      
+    }
+    
+    // Now check if snow and self shielding rasters exist
+    bool have_snow_raster;
+    bool have_self_raster;
+    double constant_snow_depth = 0;
+    double constant_self_depth = 0;
+    if (Raster_names[1] != "NULL")
+    {
+      cout << "LSDCosmoData, line 2367: Loading the snow shielding raster, " 
+           << Raster_names[1] << ".bil" <<  endl;
+      LSDRaster Snow_shield(Raster_names[1], DEM_bil_extension);
+      Snow_shielding = Snow_shield;
+      have_snow_raster = true;
+    }
+    else
+    {
+      // snow shielding with a single parameter
+      have_snow_raster = false;
+      constant_snow_depth = CRN_params[0];
+    }
+    if (Raster_names[2] != "NULL")
+    {
+      cout << "LSDCosmoData, line 2381: Loading the self shielding raster, " 
+           << Raster_names[2] << ".bil" <<  endl;
+      LSDRaster Self_shield(Raster_names[2], DEM_bil_extension);
+      Self_shielding = Self_shield;
+      have_self_raster = true;
+    }
+    else
+    {
+      // self shielding with a single parameter
+      have_self_raster = false;
+      constant_self_depth = CRN_params[1];
+    }
+    
+    // now get the snow depth and topo and self shielding from the point
+    // we need to scale the sheilding parameters
+    // now do the snow and self sheilding
+    for(int vs = 0; vs<n_valid_points; vs++)
+    {
+      // first the topo shielding
+      int row = snapped_row[vs];
+      int col = snapped_col[vs];
+      
+      topo_shield_vec.push_back(Topographic_shielding.get_data_element(row,col));
+      if(have_self_raster)
+      {
+        // get the shielding for this point
+        self_eff_depth_vec.push_back(Self_shielding.get_data_element(row,col));
+      }
+      else
+      {
+        self_eff_depth_vec.push_back(constant_self_depth);
+      }
+      if(have_snow_raster)
+      {
+        snow_eff_depth_vec.push_back(Snow_shielding.get_data_element(row,col));
+      }
+      else
+      {
+        snow_eff_depth_vec.push_back(constant_snow_depth);
+      }
+      
+      // now get the scalings
+      // now create the CRN parameters object
+      LSDCRNParameters LSDCRNP;
+      double this_elevation, this_pressure;
+  
+      // get the atmospheric parameters
+      LSDCRNP.load_parameters_for_atmospheric_scaling(path_to_atmospheric_data);
+      LSDCRNP.set_CRONUS_data_maps();
+  
+      // a function for scaling stone production, defaults to 1
+      double Fsp = 1.0;
+      
+      // now the elevation
+      this_elevation = double(topo_test.get_data_element(row,col));
+      cout << "This elevation " << this_elevation << endl;
+      
+      // now the pressure
+      this_pressure = LSDCRNP.NCEPatm_2(snapped_lat[vs], snapped_long[vs], 
+                                        double(this_elevation));
+    
+      pressure_vec.push_back(this_pressure);
+    
+      // now get the scaling
+      production_vec.push_back(LSDCRNP.stone2000sp(snapped_lat[vs],this_pressure, Fsp));
+    }
+
+  }
+  
+  // now you need to check to see if there is additional information about the soil
+  // samples. This will have the file data_name_CRNSoilInfo.csv
+  
+
+  // so now you have all the shielding and production in the four vecs:
+  //vector<double> snow_eff_depth_vec;
+  //vector<double> self_eff_depth_vec;
+  //vector<double> topo_shield_vec;
+  //vector<double> production_vec;
+  // you then use these to get at the eroion rate. 
+  for (int i = 0; i<n_valid_points; i++)
+  {
+    cout << "Sample: " <<  sample_name[ valid_cosmo_points[i]] << " snow: " << snow_eff_depth_vec[i] << " self: " << self_eff_depth_vec[i] 
+         << endl << "    topo_shield: " << topo_shield_vec[i] << " production: " << production_vec[i] << endl;
+    
+    double test_N,test_dN;
+    test_N = valid_concentrations[i];
+    test_dN =  valid_concentration_uncertainties[i];
+    
+    cout << "    Nuclude: " << valid_nuclide_names[i] << " N: " << test_N << " sigma: " << test_dN << endl;
+    
+    
+    // find any additional soil data, if it is there:
+    double this_top_eff_depth = -99;
+    double this_eff_thickness = -99;
+    if (has_soil_data_index[i] != -1)
+    {
+      // check if the vectors reference back to the correct point
+      int this_index = has_soil_data_index[i];
+      cout << "This index is: " << this_index;
+      
+      if (this_index >= int(soil_sample_index.size()))
+      {
+        cout << "WARNING: your soil sample index is: " << this_index 
+             << " which is bigger than the soil vectors." << endl;
+      }
+      else
+      {
+        this_top_eff_depth = soil_top_effective_depth[this_index];
+        this_eff_thickness = soil_effective_thickness[this_index];
+        cout << "The top eff depth of the soil sample is: " << this_top_eff_depth << endl;
+        cout << "The effective thickness is: " << this_eff_thickness << endl;
+      }
+    }
+    
+    // if there is a surface thickness, add it to the "snow" shielding
+    if(this_top_eff_depth>0)
+    {
+      snow_eff_depth_vec[i] = snow_eff_depth_vec[i]+this_top_eff_depth;
+      cout << "The updated snow is: "  << snow_eff_depth_vec[i] << endl;
+    }
+    
+    // if there is a sample thickness, add it to the "self" shielding
+    if(this_eff_thickness>0)
+    {
+      self_eff_depth_vec[i] = self_eff_depth_vec[i]+this_eff_thickness;
+      cout << "The updated self is: "  << self_eff_depth_vec[i] << endl;
+    }
+         
+    vector<double> erate_analysis = full_CRN_erosion_analysis_point(test_N, 
+                                          valid_nuclide_names[i], test_dN, 
+                                          prod_uncert_factor, Muon_scaling,
+                                          snow_eff_depth_vec[i],self_eff_depth_vec[i],
+                                          topo_shield_vec[i],production_vec[i]);
+                                          
+    double gamma_spallation = 160;
+                                          
+    // get the snow shielding. Assumes spallation only
+    double this_snow_shield = 1;
+    if (snow_eff_depth_vec[i] != 0)
+    {
+      this_snow_shield = exp(-snow_eff_depth_vec[i]/gamma_spallation);
+    }
+      
+    // now the self shiedling. Again assume spallation only
+    double this_self_shield = 1.0;
+    if (self_eff_depth_vec[i] != 0)
+    {
+      this_self_shield = gamma_spallation/self_eff_depth_vec[i]*
+                             (1-exp(-self_eff_depth_vec[i]/gamma_spallation));
+    }
+
+    double this_shielding = topo_shield_vec[i]*this_self_shield*this_snow_shield;
+    double this_comb_scaling = this_shielding*production_vec[i];
+
+    MapOfProdAndScaling["BasinRelief"][ valid_cosmo_points[i] ] = 0.0;
+    MapOfProdAndScaling["AverageProdScaling"][ valid_cosmo_points[i] ] = production_vec[i];
+    MapOfProdAndScaling["AverageTopoShielding"][ valid_cosmo_points[i] ] = topo_shield_vec[i];
+    MapOfProdAndScaling["AverageSelfShielding"][ valid_cosmo_points[i] ] = this_self_shield;
+    MapOfProdAndScaling["AverageSnowShielding"][ valid_cosmo_points[i] ] = this_snow_shield;
+    MapOfProdAndScaling["AverageShielding"][ valid_cosmo_points[i] ] =  this_shielding;
+    MapOfProdAndScaling["AverageCombinedScaling"][ valid_cosmo_points[i] ] = this_comb_scaling;
+    MapOfProdAndScaling["outlet_lat"][ valid_cosmo_points[i] ] = latitude[i];
+    MapOfProdAndScaling["OutletPressure"][ valid_cosmo_points[i] ] = pressure_vec[i];
+    MapOfProdAndScaling["OutletEffectivePressure"][ valid_cosmo_points[i] ] = pressure_vec[i];
+    MapOfProdAndScaling["centroid_lat"][ valid_cosmo_points[i] ] = latitude[i];
+    MapOfProdAndScaling["CentroidPressure"][ valid_cosmo_points[i] ] = pressure_vec[i];
+    MapOfProdAndScaling["CentroidEffectivePressure"][ valid_cosmo_points[i] ] = pressure_vec[i];
+    
+    // add the erosion rate results to the holding data member
+    erosion_rate_results[ valid_cosmo_points[i] ] = erate_analysis;
+
+  }
+
+
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// This runs the erosion rate analysis for a point in the landcape
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+vector<double> LSDCosmoData::full_CRN_erosion_analysis_point(double Nuclide_conc, string Nuclide, 
+                              double Nuclide_conc_err, double prod_uncert_factor,
+                              string Muon_scaling, double snow_eff_depth,
+                              double self_eff_depth, double topo_shield,
+                              double production)
+{
+  // the vector for holding the erosion rates and uncertainties
+  vector<double> erate_uncert_vec;
+  
+  double erate;                   // effective erosion rate g/cm^2/yr
+  double erate_external_plus;     // effective erosion rate g/cm^2/yr for AMS uncertainty +
+  double erate_external_minus;    // effective erosion rate g/cm^2/yr for AMS uncertainty -
+  double dEdExternal;             // change in erosion rate for change in AMS atoms/g
+  double External_uncert;         // uncertainty of effective erosion rate g/cm^2/yr for AMS
+  
+  
+  double production_uncertainty;  // a lumped production uncertainty value. 
+                                  // not generally used but needs to be passed
+                                  // to the erosion finding routines as a parameter
+  
+  // variables for the muon uncertainty
+  double average_production_rate; // The average production rate, used in uncertainty
+                                  // calculations
+  double erate_muon_scheme_schaller;  // erosion rate using schaller scheme
+  double erate_muon_scheme_braucher;  // erosion rate using braucher scheme
+  
+  double dEdMuonScheme;           // change in erosion rate for change in Muon Scheme
+  double Muon_uncert;             // uncertainty of effective erosion rate 
+                                  // in g/cm^2/yr for different muon schemes
+  
+  // variable for the production uncertainty
+  double erate_prod_plus;   // erosion rate for positive production uncertainty
+  double erate_prod_minus;  // erosion rate for negative production uncertainty
+  
+  double dEdProduction;        // change in erosion rate for change in production
+  double Prod_uncert;          // uncertainty of effective erosion rate 
+                               // in g/cm^2/yr for production uncertainty
+  
+  double this_prod_difference; // the difference in production for production uncertainty
+  
+  // initially we do not modify production rates
+  bool is_production_uncertainty_plus_on = false;
+  bool is_production_uncertainty_minus_on = false;
+  
+  // first get the prediction of the erosion rate
+  cout << "LINE 2993 I'm predicting the erosion rate of this sample" << endl;
+  erate = predict_CRN_erosion_point(Nuclide_conc, Nuclide, prod_uncert_factor, 
+                              Muon_scaling, production_uncertainty,
+                              average_production_rate,
+                              is_production_uncertainty_plus_on,
+                              is_production_uncertainty_minus_on, snow_eff_depth,
+                              self_eff_depth, topo_shield,production);
+  cout << "The erosion rate is: " << erate << endl;
+  
+  double no_prod_uncert = 1.0;    // set the scheme to no production uncertainty
+                                  // for the external uncertainty
+  // now get the external uncertainty                                        
+  erate_external_plus = predict_CRN_erosion_point(Nuclide_conc+Nuclide_conc_err, Nuclide, 
+                                             no_prod_uncert, Muon_scaling,
+                                             production_uncertainty,
+                                             average_production_rate,
+                                             is_production_uncertainty_plus_on,
+                                             is_production_uncertainty_minus_on, snow_eff_depth,
+                                             self_eff_depth, topo_shield,production);
+                                             
+  erate_external_minus = predict_CRN_erosion_point(Nuclide_conc-Nuclide_conc_err, Nuclide, 
+                                             no_prod_uncert, Muon_scaling,
+                                             production_uncertainty,
+                                             average_production_rate,
+                                             is_production_uncertainty_plus_on,
+                                             is_production_uncertainty_minus_on, snow_eff_depth,
+                                             self_eff_depth, topo_shield,production);
+                                             
+  dEdExternal = (erate_external_plus-erate_external_minus)/(2*Nuclide_conc_err);
+  External_uncert = fabs(dEdExternal*Nuclide_conc_err);
+  
+  //cout << "LSDCosmoBasin, line 1160, erate: " << erate << " and uncertainty: " 
+  //     << External_uncert << endl;
+
+  // now calculate uncertainty from different muon scaling schemes. 
+  // The end members are Braucher and Schaller
+  string braucher_string = "Braucher";
+  string schaller_string = "Schaller";
+  
+  // get the difference in the pair
+  LSDCRNParameters LSDCRNP;
+  int pair_key = 0;       // this is for braucher-schaller
+  vector<double> muon_uncert_diff = LSDCRNP.get_uncertainty_scaling_pair(pair_key);
+  
+  double this_muon_uncert_dif;
+  if(Nuclide == "Be10")
+  {
+    this_muon_uncert_dif = muon_uncert_diff[0];
+  }
+  else if (Nuclide == "Al26")
+  {
+    this_muon_uncert_dif = muon_uncert_diff[1];
+  }
+  else
+  {
+    cout << "LINE 1295 LSDBasin you did not supply a valid nuclide, defaulting to 10Be" << endl;
+    Nuclide = "Be10";
+    this_muon_uncert_dif = muon_uncert_diff[0];
+  }
+  
+  // now get the muon uncertainty
+  erate_muon_scheme_schaller = predict_CRN_erosion_point(Nuclide_conc, Nuclide, 
+                                             no_prod_uncert, schaller_string,
+                                             production_uncertainty,
+                                             average_production_rate,
+                                             is_production_uncertainty_plus_on,
+                                             is_production_uncertainty_minus_on, snow_eff_depth,
+                                             self_eff_depth, topo_shield,production);
+                                             
+  erate_muon_scheme_braucher = predict_CRN_erosion_point(Nuclide_conc, Nuclide, 
+                                             no_prod_uncert, braucher_string,
+                                             production_uncertainty,
+                                             average_production_rate,
+                                             is_production_uncertainty_plus_on,
+                                             is_production_uncertainty_minus_on, snow_eff_depth,
+                                             self_eff_depth, topo_shield,production);
+                                             
+  dEdMuonScheme = (erate_muon_scheme_schaller-erate_muon_scheme_braucher)/
+                  this_muon_uncert_dif;
+  Muon_uncert = fabs(dEdMuonScheme*this_muon_uncert_dif);
+  
+  //cout << "LSDCosmoBasin, Line 1292, change in scaling production rate: " 
+  //     << this_muon_uncert_dif << " erate Schal: "
+  //     << erate_muon_scheme_schaller << " erate Braucher: " 
+  //     << erate_muon_scheme_braucher << " and erate uncert: " << Muon_uncert << endl;
+  
+  // now get the production uncertainty
+  // first set the scaling
+  // reset scaling parameters. This is necessary since the F values are
+  // reset for local scaling
+  if (Muon_scaling == "Schaller" )
+  {
+    LSDCRNP.set_Schaller_parameters();
+  }
+  else if (Muon_scaling == "Braucher" )
+  {
+    LSDCRNP.set_Braucher_parameters();
+  }
+  else if (Muon_scaling == "Granger" )
+  {
+    LSDCRNP.set_Granger_parameters();
+  }
+  else if (Muon_scaling == "newCRONUS" )
+  {
+    LSDCRNP.set_newCRONUS_parameters();
+  }
+  else
+  {
+    cout << "You didn't set the muon scaling." << endl
+         << "Options are Schaller, Braucher, newCRONUS, and Granger." << endl
+         << "You chose: " << Muon_scaling << endl
+         << "Defaulting to Braucher et al (2009) scaling" << endl;
+    LSDCRNP.set_Braucher_parameters();     
+  }
+  
+  // now get the uncertainty parameters
+  vector<double> prod;
+  double prod_plus,prod_minus;
+  // get the nuclide concentration from this node
+  if (Nuclide == "Be10")
+  {
+    prod = LSDCRNP.set_P0_CRONUS_uncertainty_plus();
+    prod_plus = prod[0];
+    prod = LSDCRNP.set_P0_CRONUS_uncertainty_minus();
+    prod_minus = prod[0];
+  }
+  else if (Nuclide == "Al26")
+  {
+    prod = LSDCRNP.set_P0_CRONUS_uncertainty_plus();
+    prod_plus = prod[1];
+    prod = LSDCRNP.set_P0_CRONUS_uncertainty_minus();
+    prod_minus = prod[1];
+  }
+  else
+  {
+    cout << "You didn't give a valid nuclide. You chose: " << Nuclide << endl;
+    cout << "Choices are 10Be, 26Al.  Note these case sensitive and cannot" << endl;
+    cout << "contain spaces or control characters. Defaulting to 10Be." << endl;
+    prod = LSDCRNP.set_P0_CRONUS_uncertainty_plus();
+    prod_plus = prod[0];
+    prod = LSDCRNP.set_P0_CRONUS_uncertainty_minus();
+    prod_minus = prod[0];
+  }
+  //cout << "Prod plus: " << prod_plus << " prod minus: " << prod_minus << endl;
+  this_prod_difference = prod_plus+prod_minus;     
+  
+  
+  is_production_uncertainty_plus_on = true;
+  is_production_uncertainty_minus_on = false;
+  erate_prod_plus = predict_CRN_erosion_point(Nuclide_conc, Nuclide, 
+                                             no_prod_uncert, schaller_string,
+                                             production_uncertainty,
+                                             average_production_rate,
+                                             is_production_uncertainty_plus_on,
+                                             is_production_uncertainty_minus_on, snow_eff_depth,
+                                             self_eff_depth, topo_shield,production);
+
+  is_production_uncertainty_plus_on = false;
+  is_production_uncertainty_minus_on = true;
+  erate_prod_minus = predict_CRN_erosion_point(Nuclide_conc, Nuclide, 
+                                             no_prod_uncert, schaller_string,
+                                             production_uncertainty,
+                                             average_production_rate,
+                                             is_production_uncertainty_plus_on,
+                                             is_production_uncertainty_minus_on, snow_eff_depth,
+                                             self_eff_depth, topo_shield,production);
+  
+  dEdProduction = (erate_prod_plus-erate_prod_minus)/
+                   this_prod_difference;
+  Prod_uncert = fabs(dEdProduction*this_prod_difference);
+
+  //cout << "LSDCosmoBasin, Line 1368, change in production rate for production uncertainty: " 
+  //     << this_prod_difference << " erate plus: "
+  //     << erate_prod_plus << " erate minus: " 
+  //     << erate_prod_minus << " and erate uncert: " << Prod_uncert << endl;
+
+
+
+  // now calculate the total uncertainty
+  double total_uncert = sqrt( External_uncert*External_uncert +
+                              Muon_uncert*Muon_uncert +
+                              Prod_uncert*Prod_uncert);
+
+  erate_uncert_vec.push_back(erate);
+  erate_uncert_vec.push_back(External_uncert);
+  erate_uncert_vec.push_back(Muon_uncert);
+  erate_uncert_vec.push_back(Prod_uncert);
+  erate_uncert_vec.push_back(total_uncert);
+  
+  return erate_uncert_vec;
+} 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// This function calculates the erosion from a point location using Newton-Raphson
+//  iteration
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+double LSDCosmoData::predict_CRN_erosion_point(double Nuclide_conc, string Nuclide, 
+                                          double prod_uncert_factor,
+                                          string Muon_scaling,
+                                          double& production_uncertainty,
+                                          double& average_production,
+                                          bool is_production_uncertainty_plus_on,
+                                          bool is_production_uncertainty_minus_on,
+                                          double snow_eff_depth,
+                                          double self_eff_depth,
+                                          double topo_shield,
+                                          double production)
+{
+  // effective erosion rates (in g/cm^2/yr) for running the Newton Raphson
+  // iterations
+  double erate_guess;
+  double eff_erate_guess;
+  //double this_eff_erosion_rate;
+  //double d_eff_erosion_rate;
+  
+  double rho = 2650;  // this is the rock density but in fact it doesn't 
+                      // really play a role since it is factored into the
+                      // apparent erosion to get erosion in mm/yr but the divided
+                      // out again. 
+                      // The value 2650 is used because this is the default in cosmocalc
+
+  // production uncertainty factor is a multiplier that sets the production 
+  // certainty. If it is 1.1, there is 10% production rate uncertainty, or
+  // if it is 0.9 there is -10% unvertainty. The reason why it is implemented
+  // like this is that this allows gaussian error propigation.
+  if (prod_uncert_factor <=0)
+  {
+    cout << "You have set an unrealistic production uncertainty factor." << endl;
+    cout << "Defaulting to 1." << endl;
+    prod_uncert_factor = 1;
+  }
+
+  // initiate a particle. We'll just repeatedly call this particle
+  // for the sample. 
+  int startType = 0; 
+  double Xloc = 0;
+  double Yloc = 0;
+  double  startdLoc = 0.0;
+  double  start_effdloc = 0.0;
+  double startzLoc = 0.0;
+  // create a particle at zero depth
+  LSDCRNParticle eroded_particle(startType, Xloc, Yloc,
+                               startdLoc, start_effdloc, startzLoc);
+
+  // now create the CRN parameters object
+  LSDCRNParameters LSDCRNP;
+
+  // check the production uncertainty bools
+  if(is_production_uncertainty_plus_on)
+  {
+    if(is_production_uncertainty_minus_on)
+    {
+      cout << "You can't have both plus and minus production uncertainty on" << endl;
+      cout << "Setting minus uncertainty to false" << endl;
+      is_production_uncertainty_minus_on = false;
+    }
+  }
+
+  
+  // now set the scaling parameters
+  if (Muon_scaling == "Schaller" )
+  {
+    LSDCRNP.set_Schaller_parameters();
+  }
+  else if (Muon_scaling == "Braucher" )
+  {
+    LSDCRNP.set_Braucher_parameters();
+  }
+  else if (Muon_scaling == "Granger" )
+  {
+    LSDCRNP.set_Granger_parameters();
+  }
+  else if (Muon_scaling == "newCRONUS" )
+  {
+    LSDCRNP.set_newCRONUS_parameters();
+  }
+  else
+  {
+    cout << "You didn't set the muon scaling." << endl
+         << "Options are Schaller, Braucher, newCRONUS and Granger." << endl
+         << "You chose: " << Muon_scaling << endl
+         << "Defaulting to Braucher et al (2009) scaling" << endl;
+    LSDCRNP.set_Braucher_parameters();     
+  }
+
+  // set the scaling vector
+  vector<bool> nuclide_scaling_switches(4,false);
+  if (Nuclide == "Be10")
+  {
+    nuclide_scaling_switches[0] = true;
+  }
+  else if (Nuclide == "Al26")
+  {
+    nuclide_scaling_switches[1] = true;
+  }
+  else
+  {
+    cout << "LSDBasin line 1583, You didn't choos a valid nuclide. Defaulting"
+         << " to 10Be." << endl;
+    Nuclide = "Be10";
+    nuclide_scaling_switches[0] = true; 
+  }
+
+  // now get the guess from the particle
+  // the initial guess just takes scaling from the outlet, and then 
+  // uses that for the entire basin. This guess will probably be quite
+  // far off, but provides a useful starting point
+  
+  // the elevation, snow shielding, topographic shielding
+  // and production scaling are all independent of the erosion rate
+  // and are calculated seperately. 
+  double total_shielding =  production*topo_shield;
+                        
+  //cout << "LSDBasin line 1128 Prod scaling is: " << production_scaling[0] << endl;
+                        
+  //cout << "LSDBasin line 1129; total scaling is: " << total_shielding << endl;
+                      
+  // now recalculate F values to match the total shielding
+  LSDCRNP.scale_F_values(total_shielding,nuclide_scaling_switches);
+  double initial_snow_shield = 1.0;
+  LSDCRNP.set_neutron_scaling(production,topo_shield,
+                             initial_snow_shield);
+  
+  // get the nuclide concentration from this node
+  if (Nuclide == "Be10")
+  {
+    //cout << "LINE 1134 LSDBasin Nuclide conc is: " << Nuclide_conc << endl;
+    eroded_particle.setConc_10Be(Nuclide_conc);
+    erate_guess = eroded_particle.apparent_erosion_10Be_neutron_only(rho, LSDCRNP);
+    //cout << "Be10, initial erate guess in m/yr with density " << rho << ": " << erate_guess << endl;
+  }
+  else if (Nuclide == "Al26")
+  {
+    eroded_particle.setConc_26Al(Nuclide_conc);
+    erate_guess = eroded_particle.apparent_erosion_26Al_neutron_only(rho, LSDCRNP);
+  }
+  else
+  {
+    cout << "You didn't give a valid nuclide. You chose: " << Nuclide << endl;
+    cout << "Choices are 10Be, 26Al.  Note these case sensitive and cannot" << endl;
+    cout << "contain spaces or control characters. Defaulting to 10Be." << endl;
+    eroded_particle.setConc_10Be(Nuclide_conc);
+    erate_guess = eroded_particle.apparent_erosion_10Be_neutron_only(rho, LSDCRNP);
+  }
+  
+  // convert to  g/cm^2/yr
+  eff_erate_guess = 0.1*erate_guess*rho;
+  
+  // now using this as the initial guess, use Newton-Raphson to zero in on the
+  // correct erosion rate
+  double eff_e_new = eff_erate_guess; // the erosion rate upon which we iterate
+  double eff_e_change;                // the change in erosion rate between iterations
+  double tolerance = 1e-10;           // tolerance for a change in the erosion rate
+                                      // between Newton-Raphson iterations
+  double eff_e_displace = 1e-6;       // A small displacment in the erosion rate used
+                                      // to calculate the derivative
+  double N_this_step;                 // the concentration of the nuclide reported this step
+  double N_displace;                  // the concentration at the displaced erosion rate
+  double N_derivative;                // dN/de derivative for Newton-Raphson
+  double f_x;                         // the function being tested by newton raphson
+  double f_x_displace;                // the displaced function (for calculating the derivative)
+  
+  double this_step_prod_uncert;       // the uncertainty in the production rate
+                                      // from this step
+  double displace_uncertainty;        // the uncertainty from the displaced calculations
+                                      // is not used so a dummy variable is used here
+  do
+  {
+    // get the new values
+    //cout << "LSDBasin line 1649 You are doing this wih the effective depth driven shielding" << endl;
+    N_this_step = predict_mean_CRN_conc_point(eff_e_new, Nuclide,
+                                        prod_uncert_factor,
+                                        Muon_scaling,
+                                        this_step_prod_uncert,
+                                        is_production_uncertainty_plus_on,
+                                        is_production_uncertainty_minus_on,
+                                        snow_eff_depth, self_eff_depth,
+                                        topo_shield, production);
+      //cout << " Conc: " << N_this_step << endl;
+
+    // now get the derivative
+    N_displace = predict_mean_CRN_conc_point(eff_e_new+eff_e_displace,Nuclide,
+                                       prod_uncert_factor,Muon_scaling, 
+                                       displace_uncertainty,
+                                       is_production_uncertainty_plus_on,
+                                       is_production_uncertainty_minus_on,
+                                        snow_eff_depth, self_eff_depth,
+                                        topo_shield, production);
+
+    f_x =  N_this_step-Nuclide_conc;
+    f_x_displace =  N_displace-Nuclide_conc;
+    
+    N_derivative = (f_x_displace-f_x)/eff_e_displace;
+      
+    if(N_derivative != 0)
+    {
+      eff_e_new = eff_e_new-f_x/N_derivative;
+      
+      // check to see if the difference in erosion rates meet a tolerance
+      eff_e_change = f_x/N_derivative;
+      //cout << "Change is: " << eff_e_change << " and erosion rate is: " << eff_e_new << endl;
+    }
+    else
+    {
+      eff_e_change = 0;
+    }
+  
+  } while(fabs(eff_e_change) > tolerance);
+
+  // replace the production uncertainty
+  production_uncertainty = this_step_prod_uncert;
+  
+  return eff_e_new;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// This function calculates the Nuclide concentration from a point sample,
+//  given an erosion rate (in g/cm^2/yr)
+// it can cope with snow and self shielding
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+double LSDCosmoData::predict_mean_CRN_conc_point(double eff_erosion_rate, string Nuclide,
+                                            double prod_uncert_factor, string Muon_scaling,
+                                            double& production_uncertainty, 
+                                            bool is_production_uncertainty_plus_on,
+                                            bool is_production_uncertainty_minus_on,
+                                            double snow_eff_depth,
+                                            double self_eff_depth,
+                                            double topo_shield,
+                                            double production)
+{
+  double N;       // The number of atoms
+  
+  // production uncertainty factor is a multiplier that sets the production 
+  // certainty. If it is 1.1, there is 10% production rate uncertainty, or
+  // if it is 0.9 there is -10% unvertainty. The reason why it is implemented
+  // like this is that this allows gaussian error propigation.
+  if (prod_uncert_factor <=0)
+  {
+    cout << "You have set an unrealistic production uncertainty factor." << endl;
+    cout << "Defaulting to 1." << endl;
+    prod_uncert_factor = 1;
+  }
+
+  // the total shielding. A product of snow, topographic and production scaling
+  double total_shielding;
+  
+  // parameters for the shielding
+  double this_top_eff_depth;
+  double this_bottom_eff_depth;
+  
+  // initiate a particle. We'll just repeatedly call this particle
+  // for the sample. 
+  int startType = 0; 
+  double Xloc = 0;
+  double Yloc = 0;
+  double  startdLoc = 0.0;
+  double  start_effdloc = 0.0;
+  double startzLoc = 0.0;
+  
+  // create a particle at zero depth
+  LSDCRNParticle eroded_particle(startType, Xloc, Yloc,
+                               startdLoc, start_effdloc, startzLoc);
+
+  // now create the CRN parameters object
+  LSDCRNParameters LSDCRNP;
+
+  // at this stage we will try to replicate the basin averaging that goes on in 
+  // most paper
+  // set scaling parameters. This is necessary since the F values are
+  // reset for local scaling
+  if (Muon_scaling == "Schaller" )
+  {
+    LSDCRNP.set_Schaller_parameters();
+  }
+    else if (Muon_scaling == "Braucher" )
+  {
+    LSDCRNP.set_Braucher_parameters();
+  }
+  else if (Muon_scaling == "Granger" )
+  {
+    LSDCRNP.set_Granger_parameters();
+  }
+  else if (Muon_scaling == "newCRONUS" )
+  {
+    LSDCRNP.set_newCRONUS_parameters();
+  }
+  else
+  {
+    cout << "You didn't set the muon scaling." << endl
+         << "Options are Schaller, Braucher, newCRONUS, and Granger." << endl
+         << "You chose: " << Muon_scaling << endl
+         << "Defaulting to Braucher et al (2009) scaling" << endl;
+    LSDCRNP.set_Braucher_parameters();     
+  }
+
+  // check the production uncertainty bools
+  if(is_production_uncertainty_plus_on)
+  {
+    if(is_production_uncertainty_minus_on)
+    {
+      cout << "You can't have both plus and minus production uncertainty on" << endl;
+      cout << "Setting minus uncertainty to false" << endl;
+      is_production_uncertainty_minus_on = false;
+    }
+  }
+
+  // set the scaling to the correct production uncertainty
+  vector<double> test_uncert;
+  if(is_production_uncertainty_plus_on)
+  {
+    test_uncert = LSDCRNP.set_P0_CRONUS_uncertainty_plus();
+  }
+  else if(is_production_uncertainty_minus_on)
+  {
+    test_uncert = LSDCRNP.set_P0_CRONUS_uncertainty_minus();
+  }
+
+  // set the scaling vector
+  vector<bool> nuclide_scaling_switches(4,false);
+  if (Nuclide == "Be10")
+  {
+    nuclide_scaling_switches[0] = true;
+  }
+  else if (Nuclide == "Al26")
+  {
+    nuclide_scaling_switches[1] = true;
+  }
+  else
+  {
+    cout << "LSDBasin line 1583, You didn't choos a valid nuclide. Defaulting"
+         << " to 10Be." << endl;
+    Nuclide = "Be10";
+    nuclide_scaling_switches[0] = true; 
+  }
+
+  // now you need logic to test if you are accounting for self shielding
+  double total_shielding_no_uncert = production*topo_shield;
+  total_shielding = prod_uncert_factor*total_shielding_no_uncert;
+
+  // scale the F values
+  LSDCRNP.scale_F_values(total_shielding,nuclide_scaling_switches);
+
+
+  // get the snow shielding
+  this_top_eff_depth = snow_eff_depth;
+
+  // get the self_shielding
+  this_bottom_eff_depth = this_top_eff_depth+self_eff_depth;
+      
+      
+  // get the nuclide concentration from this node
+  if (Nuclide == "Be10")
+  {
+    //cout << "LInE 2271, 10Be" << endl;
+    eroded_particle.update_10Be_SSfull_depth_integrated(eff_erosion_rate,LSDCRNP,
+                                       this_top_eff_depth, this_bottom_eff_depth);
+    N=eroded_particle.getConc_10Be();
+  }
+  else if (Nuclide == "Al26")
+  {
+    //cout << "LINE 2278, 26Al" << endl;
+    eroded_particle.update_26Al_SSfull_depth_integrated(eff_erosion_rate,LSDCRNP,
+                                       this_top_eff_depth, this_bottom_eff_depth);
+    N=eroded_particle.getConc_26Al();
+  }
+  else
+  {
+    cout << "You didn't give a valid nuclide. You chose: " << Nuclide << endl;
+    cout << "Choices are 10Be, 26Al.  Note these case sensitive and cannot" << endl;
+    cout << "contain spaces or control characters. Defaulting to 10Be." << endl;
+    eroded_particle.update_10Be_SSfull_depth_integrated(eff_erosion_rate,LSDCRNP,
+                                       this_top_eff_depth, this_bottom_eff_depth);
+    N=eroded_particle.getConc_10Be();         
+  }
+
+  // return the nuclide concentration
+  return N;
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
@@ -2924,7 +4608,7 @@ void LSDCosmoData::full_shielding_raster_printer(vector<string> Raster_names,
                                          Topographic_shielding,
                                          path_to_atmospheric_data);
 
-      // get the predix of the basin vectors
+      // get the prefix of the basin vectors
       string basin_ID =  itoa(valid_cosmo_points[samp]);
       string basin_ext = "_BASIN"+basin_ID;
       string thisfilename = Raster_names[0]+basin_ext;
@@ -2948,7 +4632,7 @@ void LSDCosmoData::full_shielding_raster_printer(vector<string> Raster_names,
     
 
      
-  }    // finsiehd logic for a DEM with valid points
+  }    // finished logic for a DEM with valid points
   else
   {
     cout << "There are no valid CRN points in this raster" << endl;
@@ -2966,7 +4650,7 @@ void LSDCosmoData::full_shielding_raster_printer(vector<string> Raster_names,
 void LSDCosmoData::calculate_erosion_rates(int method_flag)
 {
 
-  if (method_flag != 0 && method_flag != 1 && method_flag != 2)
+  if (method_flag != 0 && method_flag != 1 && method_flag != 2 && method_flag != 3)
   {
     cout << "Warning, you did not give a valid method flag. Assuming you've used spawned basins" << endl;
     method_flag = 2;
@@ -2996,6 +4680,11 @@ void LSDCosmoData::calculate_erosion_rates(int method_flag)
     {
       full_shielding_cosmogenic_analysis_for_spawned(this_Raster_names,this_Param_names);
     }
+    else if (method_flag == 3)
+    {
+      cout << "You are doing soil samples on DEM: " <<  this_Raster_names[0] << endl;
+      Soil_sample_calculator(this_Raster_names,this_Param_names);
+    }
     else
     {
       full_shielding_cosmogenic_analysis(this_Raster_names,this_Param_names);
@@ -3005,6 +4694,145 @@ void LSDCosmoData::calculate_erosion_rates(int method_flag)
 
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDCosmoData::point_measurements(vector<int> valid_samples,vector<double> snow_thickness, 
+                                      vector<double> self_thickness,
+                                      vector<double> toposhield,
+                                      vector<double> production_scaling, 
+                                      string muon_string)
+{
+  int N_valid_samples =  int(valid_samples.size());
+
+  // now loop through the samples, printing the ones with data
+  for (int i = 0; i<N_valid_samples; i++)
+  {
+    // initiate the vector for holding the erate
+    vector<double> erate_info;
+    vector<double> erate_info_AMS_err;
+    vector<double> erate_info_scaling_err;
+    vector<double> erate_info_prod_err;  
+    
+    // get this sample
+    int this_sample = valid_samples[i];
+    double this_C = Concentration[this_sample];
+    double this_dC = Concentration_uncertainty[this_sample];
+    string this_nuclide = nuclide[this_sample];
+    double top_eff_depth = snow_thickness[i];     // even if there is shielding these
+    double bottom_eff_depth = snow_thickness[i]+self_thickness[i];  // get subsumed into the combined scaling 
+    double combined_scaling = toposhield[i]* production_scaling[i];
+    
+    double rho = 2650;
+    
+    // now get apparent erosion rates that cosmocalc would have produced
+    int startType = 0; 
+    double Xloc = 0;
+    double Yloc = 0;
+    double  startdLoc = 0.0;
+    double  start_effdloc = 0.0;
+    double startzLoc = 0.0;
+      
+    LSDCRNParticle test_particle(startType, Xloc, Yloc,
+                              startdLoc, start_effdloc, startzLoc);
+      
+    LSDCRNParameters LSDCRNP;
+    // at this stage we will try to replicate the basin averaging that goes on in 
+    // most paper
+    // set scaling parameters. This is necessary since the F values are
+    // reset for local scaling
+    if (Muon_scaling == "Schaller" )
+    {
+      LSDCRNP.set_Schaller_parameters();
+    }
+      else if (Muon_scaling == "Braucher" )
+    {
+      LSDCRNP.set_Braucher_parameters();
+    }
+    else if (Muon_scaling == "Granger" )
+    {
+      LSDCRNP.set_Granger_parameters();
+    }
+    else if (Muon_scaling == "newCRONUS" )
+    {
+      LSDCRNP.set_newCRONUS_parameters();
+    }
+    else
+    {
+      cout << "You didn't set the muon scaling." << endl
+           << "Options are Schaller, Braucher, newCRONUS, and Granger." << endl
+           << "You chose: " << Muon_scaling << endl
+           << "Defaulting to Braucher et al (2009) scaling" << endl;
+      LSDCRNP.set_Braucher_parameters();     
+    }
+    
+    
+    if (nuclide[i] == "Be10")
+    {
+      test_particle.setConc_10Be(this_C);
+      erate_info=test_particle.apparent_erosion_10Be_COSMOCALC(rho, LSDCRNP, 
+                                 combined_scaling,
+                                 muon_string, top_eff_depth, bottom_eff_depth);
+    }
+    else if(nuclide[i] == "Al26")    
+    {
+      test_particle.setConc_26Al(this_C);
+      erate_info=test_particle.apparent_erosion_26Al_COSMOCALC(rho, LSDCRNP, 
+                                 combined_scaling,
+                                 muon_string, top_eff_depth, bottom_eff_depth);
+    }
+    
+    // now do the error from the AMS measurement
+    if (nuclide[i] == "Be10")
+    {
+      test_particle.setConc_10Be(this_C+this_dC);
+      erate_info_AMS_err=test_particle.apparent_erosion_10Be_COSMOCALC(rho, LSDCRNP, 
+                                 combined_scaling,
+                                 muon_string, top_eff_depth, bottom_eff_depth);
+    }
+    else if(nuclide[i] == "Al26")    
+    {
+      test_particle.setConc_26Al(this_C+this_dC);
+      erate_info_AMS_err=test_particle.apparent_erosion_26Al_COSMOCALC(rho, LSDCRNP, 
+                                 combined_scaling,
+                                 muon_string, top_eff_depth, bottom_eff_depth);
+    }
+    
+    // now do the error from the scaling
+    string new_muon_string = "Schaller";
+    if (nuclide[i] == "Be10")
+    {
+      test_particle.setConc_10Be(this_C);
+      erate_info_scaling_err=test_particle.apparent_erosion_10Be_COSMOCALC(rho, LSDCRNP, 
+                                 combined_scaling,
+                                 new_muon_string, top_eff_depth, bottom_eff_depth);
+    }
+    else if(nuclide[i] == "Al26")    
+    {
+      test_particle.setConc_26Al(this_C);
+      erate_info_scaling_err=test_particle.apparent_erosion_26Al_COSMOCALC(rho, LSDCRNP, 
+                                 combined_scaling,
+                                 new_muon_string, top_eff_depth, bottom_eff_depth);
+    }
+    
+    // now do the error from the production, assumes 10% production error
+    if (nuclide[i] == "Be10")
+    {
+      test_particle.setConc_10Be(this_C);
+      erate_info_scaling_err=test_particle.apparent_erosion_10Be_COSMOCALC(rho, LSDCRNP, 
+                                 combined_scaling*(1.1),
+                                 muon_string, top_eff_depth, bottom_eff_depth);
+    }
+    else if(nuclide[i] == "Al26")    
+    {
+      test_particle.setConc_26Al(this_C);
+      erate_info_scaling_err=test_particle.apparent_erosion_26Al_COSMOCALC(rho, LSDCRNP, 
+                                 combined_scaling*(1.1),
+                                 muon_string, top_eff_depth, bottom_eff_depth);
+    }
+  }
+      
+}
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
@@ -3121,7 +4949,7 @@ void LSDCosmoData::print_results()
       double Yloc = 0;
       double  startdLoc = 0.0;
       double  start_effdloc = 0.0;
-      double startzLoc = 100;
+      double startzLoc = 0;
       
       LSDCRNParticle test_particle(startType, Xloc, Yloc,
                               startdLoc, start_effdloc, startzLoc);
@@ -3143,7 +4971,7 @@ void LSDCosmoData::print_results()
       }
       else if(nuclide[i] == "Al26")    
       {
-        test_particle.setConc_10Be(Concentration[i]);
+        test_particle.setConc_26Al(Concentration[i]);
         erate_info=test_particle.apparent_erosion_26Al_COSMOCALC(rho, LSDCRNP, 
                                  MapOfProdAndScaling["AverageCombinedScaling"][i],
                                  muon_string, top_eff_depth, bottom_eff_depth);
@@ -3160,7 +4988,7 @@ void LSDCosmoData::print_results()
       }
       else if(nuclide[i] == "Al26")    
       {
-        test_particle.setConc_10Be(Concentration[i]);
+        test_particle.setConc_26Al(Concentration[i]);
         erate_info_CCCR=test_particle.apparent_erosion_26Al_COSMOCALC(rho, LSDCRNP, 
                                  MapOfProdAndScaling["AverageShielding"][i]*
                                  MapOfProdAndScaling["AverageProdScaling"][i],
@@ -3217,7 +5045,225 @@ void LSDCosmoData::print_results()
   results_out.close();
   CRONUS_out.close();
 }
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function prints a production raster for any of the rasters in the list
+// that has a valid cosmo point
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDCosmoData::print_scaling_and_shielding_complete_rasters()
+{
+  // vector that will contain the snow and self shielding values, if they are constant
+  vector<double> this_Params;
+  
+  // loop through the lines in the files, checking to see if the 
+  // georeferencing is equivalent
+  string bil_ext = "bil";
+  string null_str = "NULL";
+  int N_DEMS = int(DEM_names_vecvec.size());
+  for(int iDEM = 0; iDEM<N_DEMS; iDEM++)
+  {
+    // get snow and self shielding parameters (this will only be used if the now and
+    // self shielding rasters are empty)
+    this_Params = snow_self_topo_shielding_params[iDEM];
+    
+    // get the names from this DEM
+    vector<string>  DEM_names_vec = DEM_names_vecvec[iDEM];
+    cout << "Checking rasters, this raster is: " << DEM_names_vec[0] << endl;
+    string DEM_fname = DEM_names_vec[0];
+    
+    // load the DEM
+    LSDRaster topo_test(DEM_fname, bil_ext);
+    
+    // Fill the DEM, since the production rates for the calculators are derived 
+    // the filled rasters
+    LSDRaster filled_raster = topo_test.fill(min_slope);
+    
+    // get the rows and columns
+    int NRows, NCols;
+    NRows = filled_raster.get_NRows();
+    NCols = filled_raster.get_NCols();
+    float NoDataValue =  filled_raster.get_NoDataValue();
+    float XMinimum =  filled_raster.get_XMinimum();
+    float YMinimum =  filled_raster.get_YMinimum();
+    float DataResolution = filled_raster.get_DataResolution();
+    map<string,string> GeoReferencingStrings = filled_raster.get_GeoReferencingStrings();
+    
+    // initiate the arrays that will contain the data
+    Array2D<float> NewPressure(NRows,NCols,NoDataValue);
+    Array2D<float> NewScaling(NRows,NCols,NoDataValue);
+    Array2D<float> NewCombinedShielding(NRows,NCols,NoDataValue);
+    Array2D<float> NewCombinedScaling(NRows,NCols,NoDataValue);
+
+    // see if there are raster for the snow, self and toposhield rasters
+    // now toposhielding. Initially, we assume there are none. 
+    bool there_is_toposhield = false;
+    bool there_is_snowshield = false;
+    bool there_is_selfshield = false;
+    
+    // First initiate pointers to the rasters
+    LSDRaster Topographic_shielding;
+    LSDRaster Snow_shielding;
+    LSDRaster Self_shielding;
+    
+
+
+    if(DEM_names_vec[1] != null_str)
+    {
+      there_is_snowshield = true;
+      LSDRaster Sn_shield(DEM_names_vec[1], bil_ext);
+      Snow_shielding = Sn_shield;
+    }
+    // now self shielding
+    if(DEM_names_vec[2] != null_str)
+    {
+      there_is_selfshield = true;
+      LSDRaster Slf_shield(DEM_names_vec[2], bil_ext);
+      Self_shielding = Slf_shield;
+    }
+    // now toposhielding
+    if(DEM_names_vec[3] != null_str)
+    {
+      there_is_toposhield = true;
+      LSDRaster T_shield(DEM_names_vec[3], bil_ext);
+      Topographic_shielding = T_shield;
+    }
+
+    // now create the CRN parameters object
+    LSDCRNParameters LSDCRNP;
+    double gamma_spallation = 160;      // in g/cm^2: spallation attentuation depth
+
+    // get the atmospheric parameters
+    LSDCRNP.load_parameters_for_atmospheric_scaling(path_to_atmospheric_data);
+    LSDCRNP.set_CRONUS_data_maps();
+  
+    // a function for scaling stone production, defaults to 1
+    double Fsp = 1.0;
+  
+    // the latitude and longitude
+    double lat,longitude;
+  
+    // decalre converter object
+    LSDCoordinateConverterLLandUTM Converter;
+    
+    // Get some temporary variables for holding the data. These will get printed
+    // to and array.
+    float this_elevation;
+    float this_pressure;
+    float this_scaling;
+    float this_shielding;
+    float this_combined_scaling;
+    
+    // teporary values for the shielding
+    float this_snowshield;
+    float this_selfshield;
+    float this_toposhield;
+
+    // now loop through the rows and columns, populating the scaling values
+    for(int row = 0; row<NRows; row++)
+    {
+      for(int col = 0; col<NCols; col++)
+      {
+        // now the elevation
+        this_elevation = filled_raster.get_data_element(row,col);
+
+        // Only do something if there is data
+        if(this_elevation != NoDataValue)
+        {
+          // To get pressure, first get the lat and long
+          filled_raster.get_lat_and_long_locations(row, col, lat, longitude, Converter);
+
+          // now the pressure
+          this_pressure = LSDCRNP.NCEPatm_2(double(lat), double(longitude), 
+                                        double(this_elevation));
+
+          // now get the scaling
+          this_scaling = LSDCRNP.stone2000sp(lat,this_pressure, Fsp);
+        
+          // update the scaling array
+          NewScaling[row][col] = this_scaling;
+          NewPressure[row][col] = this_pressure;
+          
+          // now get combined shielding and scaling
+          // first topographic shielding
+          if (there_is_toposhield)
+          {
+            this_toposhield = Topographic_shielding.get_data_element(row,col);
+          }
+          else
+          {
+            this_toposhield = 1;
+          }
+          
+          // now snow shielding
+          if (there_is_snowshield)
+          {
+            this_snowshield = exp(-Snow_shielding.get_data_element(row,col)/gamma_spallation);
+          }
+          else
+          {
+            this_snowshield = exp(-this_Params[0]/gamma_spallation);
+          }
+          if (there_is_selfshield)
+          {
+            this_selfshield = gamma_spallation/Self_shielding.get_data_element(row,col)*
+                             (1-exp(-Self_shielding.get_data_element(row,col)/gamma_spallation));
+          
+          }
+          else
+          {
+            this_selfshield = gamma_spallation/this_Params[1]*
+                             (1-exp(-this_Params[1]/gamma_spallation));
+          }
+          
+          // now get the products
+          this_shielding = this_toposhield*this_snowshield*this_selfshield;
+          this_combined_scaling = this_shielding*this_scaling;
+          
+          NewCombinedScaling[row][col]= this_combined_scaling;
+          NewCombinedShielding[row][col] = this_shielding;
+        }           // END test of no data
+      }             // END columns loop
+    }               // END rows loop
+    
+    // now get the rasters
+    LSDRaster CombinedScalingRaster(NRows, NCols, XMinimum, YMinimum, DataResolution,
+                               NoDataValue, NewCombinedScaling, GeoReferencingStrings);
+    LSDRaster CombinedShieldingRaster(NRows, NCols, XMinimum, YMinimum, DataResolution,
+                               NoDataValue, NewCombinedShielding, GeoReferencingStrings);
+    LSDRaster ScalingRaster(NRows, NCols, XMinimum, YMinimum, DataResolution,
+                               NoDataValue, NewScaling, GeoReferencingStrings);
+    LSDRaster PressureRaster(NRows, NCols, XMinimum, YMinimum, DataResolution,
+                               NoDataValue, NewPressure, GeoReferencingStrings);
+                               
+    // Format the filenames
+    string CShield_ext = "_CSHIELD";
+    string CScale_ext = "_CSCALE";
+    string P_ext = "_PRES";
+    string Prod_ext = "_PROD";
+    
+    // print the rasters
+    PressureRaster.write_raster(DEM_fname+P_ext,bil_ext);
+    ScalingRaster.write_raster(DEM_fname+Prod_ext,bil_ext);
+    CombinedScalingRaster.write_raster(DEM_fname+CScale_ext,bil_ext);
+    CombinedShieldingRaster.write_raster(DEM_fname+CShield_ext,bil_ext); 
+  }                 // END DEM loop
+  
+  
+  cout << endl << endl << "=====================================================" << endl;
+  cout << "++WARNING++"  << endl;
+  cout << "You have printed the scaling, sheilding and production rasters." << endl;
+  cout << " The snow and self shielding are determined by an approximation, " << endl;
+  cout << " where shielding is due to attenuation of spallation only." << endl;
+  cout << " This differs from the full analysis which uses an analytical solution" << endl;
+  cout << " of all the production mechanisms (incl. muons)." << endl;
+  cout << "See Mudd et al (2016) ESURF for details." << endl;
+  cout << "=====================================================" << endl;
+
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 
 #endif

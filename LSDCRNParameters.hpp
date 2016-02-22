@@ -210,7 +210,16 @@ class LSDCRNParameters
   /// @date 27/01/2015
   void set_Braucher_parameters();
   
+  /// @brief This resets the F, Gamma and P0 values 
+  /// For 10Be, these correspond to new production curves provided by Shasta Marerro
+  //  For the rest they conform to 
+  /// Braucher et al (2009) scaling. Adopted from from Vermeesh 2007, 
+  /// @detail From version 2.0 of cosmocalc
+  /// @author SMM
+  /// @date 28/01/2016
+  void set_newCRONUS_parameters();
   
+    
   /// @brief this resets the production and decay coefficients of 10Be and 26Al
   ///  to mimic the parameters for stone scaling in CRONUS calculator
   /// @detail IMPORTANT the F and Gamma numbers are not changed so you will 
@@ -501,7 +510,16 @@ class LSDCRNParameters
   /// @date 15/03/2015
   void print_parameters_to_file(string fname, string muon_scaling);
 
-
+  /// @brief this Prints the prodcution rates for muons for various schemes to 
+  /// a csv file
+  /// @detail The parameter file contains a column for effective depth, and then
+  ///  columns for the production of muons from different production schemes
+  /// @param fname the filename with full file path
+  /// @param path_to_atmospheric_data the path to the folder containing atmospheric data
+  /// @author SMM
+  /// @date 18/02/2016
+  void Print_10Beproduction_csv(string filename, string path_to_atmospheric_data);
+  
   private:
   /// @brief This is called by the default constructor. 
   /// It is the only possible constructor

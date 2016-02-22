@@ -4937,13 +4937,13 @@ void LSDJunctionNetwork::couple_hillslope_nodes_to_channel_nodes(LSDRaster& Elev
 //----------------------------------------------------------------------------------------
 // This function removes patches of floodplain that are not connected to the channel network.
 // It must be passed an LSDIndexRaster with the floodplain patches labelled with a specific ID
-// number (done using Dave's connected components algorithm). Return is a binary array where 
-// 0 is hillslope pixels; 1 is floodplain pixels; and 2 is channel pixels.
+// number (done using Dave's connected components algorithm). Return is a connected components index
+// raster with the hillslope patches removed.
 // FJC 21/10/15
 //---------------------------------------------------------------------------------------- 
 LSDIndexRaster LSDJunctionNetwork::remove_hillslope_patches_from_floodplain_mask(LSDIndexRaster& FloodplainPatches)
 {
-  Array2D<int> FloodplainPatches_array(NRows,NCols,0);
+  Array2D<int> FloodplainPatches_array(NRows,NCols,NoDataValue);
   vector<int> patch_ids_channel;
   
   //loop through the DEM and get the ID of all patches connected to the channel network
@@ -4951,10 +4951,10 @@ LSDIndexRaster LSDJunctionNetwork::remove_hillslope_patches_from_floodplain_mask
   {
     for (int col = 0; col < NCols; col++)
     {
-      if (StreamOrderArray[row][col] > 0)
-      {
-        FloodplainPatches_array[row][col] = 2;  
-      }
+      //if (StreamOrderArray[row][col] > 0)
+      //{
+      //  FloodplainPatches_array[row][col] = 2;  
+      //}
       if (FloodplainPatches.get_data_element(row, col) != NoDataValue)
       {
       //check if the pixel is part of the channel network
@@ -4974,11 +4974,11 @@ LSDIndexRaster LSDJunctionNetwork::remove_hillslope_patches_from_floodplain_mask
     {
       if (FloodplainPatches.get_data_element(row, col) != NoDataValue)
       {
-        float patch_id = FloodplainPatches.get_data_element(row, col);
+        int patch_id = FloodplainPatches.get_data_element(row, col);
         find_it = find(patch_ids_channel.begin(), patch_ids_channel.end(), patch_id);   //search ID vector for patch ID of pixel
         if (find_it != patch_ids_channel.end())
         {
-          FloodplainPatches_array[row][col] = 1;                
+          FloodplainPatches_array[row][col] = patch_id;                
         }
       }      
     }
@@ -4987,6 +4987,74 @@ LSDIndexRaster LSDJunctionNetwork::remove_hillslope_patches_from_floodplain_mask
   //get the LSDIndexRaster from floodplain patches array
   LSDIndexRaster FloodplainPatches_final(NRows,NCols, XMinimum, YMinimum, DataResolution, NoDataValue, FloodplainPatches_array, GeoReferencingStrings);
   return FloodplainPatches_final;  
+}
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// Calculate relief relative to channel
+// This calculates relief of each pixel compared to the nearest channel pixel 
+// Uses a threshold stream order to avoid small tributaries
+//
+// FJC 17/11/15
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+LSDRaster LSDJunctionNetwork::calculate_relief_from_channel(LSDRaster& ElevationRaster, LSDFlowInfo& FlowInfo, int threshold_SO)
+{
+  Array2D<float> ReliefArray(NRows, NCols, NoDataValue);
+  
+  for (int row = 0; row < NRows; row++)
+  {
+    for (int col = 0; col < NCols; col++)
+    {
+      float this_elevation = ElevationRaster.get_data_element(row,col);
+      if (this_elevation != NoDataValue)
+      {
+        //get the nearest channel pixel 
+        int CurrentNode = FlowInfo.retrieve_node_from_row_and_column(row,col);
+        int BaseLevel = FlowInfo.is_node_base_level(CurrentNode);
+        //if already at a channel then set relief to 0
+        if (StreamOrderArray[row][col] != NoDataValue && StreamOrderArray[row][col] >= threshold_SO
+        && BaseLevel == 0) 
+        {
+          ReliefArray[row][col] = 0;
+        }
+        //if not at a channel, move downstream
+        else
+        {
+          bool ReachedChannel = false;
+          while (ReachedChannel == false)
+          {
+            //get receiver information
+            int ReceiverNode, ReceiverRow, ReceiverCol;
+            FlowInfo.retrieve_receiver_information(CurrentNode, ReceiverNode, ReceiverRow, ReceiverCol); 
+            //if node is at baselevel then exit
+            if (CurrentNode == ReceiverNode)
+            {
+              ReachedChannel = true;
+            }          
+            //if receiver is a channel > threshold then get the relief
+            if (StreamOrderArray[ReceiverRow][ReceiverCol] != NoDataValue &&
+            StreamOrderArray[ReceiverRow][ReceiverCol] >= threshold_SO)
+            {
+              ReachedChannel = true;
+              float channel_elevation = ElevationRaster.get_data_element(ReceiverRow, ReceiverCol);
+              //get the relief of the pixel (Pixel Elevation - Channel Elevation)
+              ReliefArray[row][col] = (this_elevation - channel_elevation);
+            } 
+            else
+            {
+              //move downstream
+              CurrentNode = ReceiverNode;
+            }
+          }         
+        }
+      }         
+    }
+  }
+  
+  LSDRaster Relief(NRows,NCols, XMinimum, YMinimum, DataResolution, NoDataValue, ReliefArray, GeoReferencingStrings);
+  return Relief;
 }
 
 
