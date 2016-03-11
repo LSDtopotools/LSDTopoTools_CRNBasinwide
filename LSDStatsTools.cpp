@@ -450,6 +450,39 @@ float get_range_ignore_ndv(Array2D<float>& data, float ndv)
   return range;
 }  
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// gets the range from a vector of data
+// ignores no data values
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+float get_range_from_vector(vector<float>& y_data, float ndv)
+{
+  float min = 0;
+  float max = 0;
+  int flag = 0;
+  for (int i =0; i < int(y_data.size()); i++)
+  {
+    if (y_data[i] != ndv)
+    {
+      if (flag == 0)
+      {
+      	min = y_data[i];
+        max = y_data[i];
+        flag = 1;
+      }
+      if (y_data[i] < min)
+      {
+      	min = y_data[i];
+      }
+      if (y_data[i] > max)
+      {
+        max = y_data[i];
+			}
+    }
+	}
+    
+  float range = max-min;
+  return range;    
+}
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // gets the standard deviation from a population of data
@@ -674,6 +707,56 @@ void quantile_quantile_analysis(vector<float>& data, vector<float>& values, vect
 //   cout << "slope = " << slope << endl;
   float centerx = (q25x + q75x)/2;
   float centery = (q25y + q75y)/2;
+  float intercept =centery-slope*centerx; 
+  vector<float> mn_vals;
+  
+  for(int i = 0; i < N_points; ++i)
+  {
+    mn_vals.push_back(intercept+slope*snv[i]);
+  }
+  
+  standard_normal_variates=snv;
+  values = vals;
+  mn_values = mn_vals;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// quantile_quantile_analysis
+// sorts data; produces quartile-quantile comparison against standard normal variate, returning
+// a sorted subsample of N_points, their corresponding normal variate and the reference value 
+// from the standard normal distribution
+// DTM 28/11/2014
+// Modified by FJC 03/03/16 to get the percentiles for the normally distributed model as an
+// argument.
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+void quantile_quantile_analysis_defined_percentiles(vector<float>& data, vector<float>& values, vector<float>& standard_normal_variates, vector<float>& mn_values, int N_points, int lower_percentile, int upper_percentile)
+{
+  vector<size_t> index_map;   
+  vector<float> data_sorted;
+  matlab_float_sort(data, data_sorted, index_map);
+  float quantile,x;
+  vector<float> snv,vals;
+  
+  for(int i = 0; i < N_points; ++i)
+  {
+    quantile = (1.+ float(i))/(float(N_points)+1.);
+    x = (sqrt(2)*inverf(quantile*2-1));
+    vals.push_back(get_percentile(data_sorted, quantile*100));
+    snv.push_back(x);
+  }
+  // CONSTRUCTING NORMALLY DISTRIBUTED MODEL
+  // Now get upper quartile and lower quartile boundaries
+  float q_lower_x = get_percentile(snv,lower_percentile);
+  float q_upper_x = get_percentile(snv,upper_percentile);
+  float q_lower_y = get_percentile(vals,lower_percentile);
+  float q_upper_y = get_percentile(vals,upper_percentile);
+  
+  float slope = (q_upper_y-q_lower_y)/(q_upper_x-q_lower_x);
+//   cout << "slope = " << slope << endl;
+  float centerx = (q_lower_x + q_upper_x)/2;
+  float centery = (q_lower_y + q_upper_y)/2;
   float intercept =centery-slope*centerx; 
   vector<float> mn_vals;
   

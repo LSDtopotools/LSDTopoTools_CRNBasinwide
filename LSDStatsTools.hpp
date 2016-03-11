@@ -77,6 +77,7 @@ float get_mean_ignore_ndv(Array2D<float>& data, float ndv);
 float get_SST(vector<float>& y_data, float mean);
 float get_variance_ignore_ndv(Array2D<float>& data, float ndv, float mean); 
 float get_range_ignore_ndv(Array2D<float>& data, float ndv);
+float get_range_from_vector(vector<float>& y_data, float ndv);
 float get_durbin_watson_statistic(vector<float> residuals);
 float get_standard_deviation(vector<float>& y_data, float mean);
 float get_standard_error(vector<float>& y_data, float standard_deviation);
@@ -99,6 +100,10 @@ void generate_q_q_plot(vector<float>& data, vector<float>& values, vector<float>
 
 // declaration of the quantile_quantile analysis
 void quantile_quantile_analysis(vector<float>& data, vector<float>& values, vector<float>& standard_normal_variates, vector<float>& mn_values, int N_points);
+
+// declaration of the quantile_quantile analysis
+// modified to pass in percentiles as arguments
+void quantile_quantile_analysis_defined_percentiles(vector<float>& data, vector<float>& values, vector<float>& standard_normal_variates, vector<float>& mn_values, int N_points, int lower_percentile, int upper_percentile);
 
 // calculates least squares linear regression for two datasets, returning
 // gradient and intercept of regression line, alongside the R-squared value. 

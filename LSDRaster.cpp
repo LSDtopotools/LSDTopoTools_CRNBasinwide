@@ -664,6 +664,24 @@ void LSDRaster::read_raster(string filename, string extension)
           }
         }
       }
+      else if (DataType == 5)
+      {
+        double temp;
+        cout << "I am trying to load a double precision raster. Wish me luck!" << endl;
+        for (int i=0; i<NRows; ++i)
+        {
+          for (int j=0; j<NCols; ++j)
+          {
+            ifs_data.read(reinterpret_cast<char*>(&temp), sizeof(temp));
+            
+            data[i][j] = double(temp);
+            if (data[i][j]<-1e10)
+            {
+              data[i][j] = NoDataValue;
+            }
+          }
+        }
+      }
       else if (DataType == 13)
       {
         unsigned long int temp;
@@ -11155,7 +11173,7 @@ float LSDRaster::get_threshold_for_floodplain(float bin_width, float peak_thresh
 // Function to set the threshold value to use in floodplain extraction using QQ plots
 // FJC 16/11/15
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-float LSDRaster::get_threshold_for_floodplain_QQ(string q_q_filename)
+float LSDRaster::get_threshold_for_floodplain_QQ(string q_q_filename, float threshold_condition, int lower_percentile, int upper_percentile)
 {
   //get vector of raster data
   vector<float> raster_vector; 
@@ -11169,7 +11187,7 @@ float LSDRaster::get_threshold_for_floodplain_QQ(string q_q_filename)
   
   vector<float> quantile_values,normal_variates,mn_values;
   int N_points = 10000;//values.size();
-  quantile_quantile_analysis(raster_vector, quantile_values, normal_variates, mn_values, N_points);
+  quantile_quantile_analysis_defined_percentiles(raster_vector, quantile_values, normal_variates, mn_values, N_points, lower_percentile, upper_percentile);
   ofstream ofs;
   ofs.open(q_q_filename.c_str());
   
@@ -11186,35 +11204,49 @@ float LSDRaster::get_threshold_for_floodplain_QQ(string q_q_filename)
   }
   ofs.close();
   
+  //get range of values - used to get the threshold value
+  float range = get_range_from_vector(quantile_values, NoDataValue);
+	cout << "Range: " << range << endl;
+    
   // Find q-q threshold
   cout << "\t finding deviation from Gaussian distribution to define q-q threshold" << endl;
-  vector<int> indices;
   int flag = 0;
-  float threshold_condition=0.99;
-  int threshold_index=0;
   float threshold=0;
-  for(int i = 0; i<n_values; ++i)
+	float min_length=200;
+
+	for (int i =0; i < n_values; i++)
   {
-    if(normal_variates[i] <= 0)
+    if (normal_variates[i] <= 0)
     {
-      if(mn_values[i]>threshold_condition*quantile_values[i])
-      {
-        if (flag==0)
-        {
-          flag = 1;
-          threshold_index = i;
-          threshold = quantile_values[i];
-          cout << "Quantile value at threshold: " << quantile_values[i] << " Normal variate: " << normal_variates[i] << endl;
-        }
-      }
-      else flag = 0;
+			// get difference between real and normal distributions	
+    	float diff = abs(quantile_values[i] - mn_values[i]);
+			// express as fraction of the range of data
+			float frac_diff = diff/range;
+			if (frac_diff < threshold_condition)
+			{
+				// first time the condition is fulfilled
+				if (flag == 0)
+				{
+					flag = 1; 
+					int count = 0;
+					//search next points to check if they also fulfil the condition
+					for (int j = 1; j <= min_length; j++)
+					{
+						float next_diff = abs(quantile_values[i+j] - mn_values[i+j]);
+						float next_frac = next_diff/range;
+						if (next_frac < threshold_condition) count++;											
+					}
+					//cout << "Count is: " << count << endl;
+					if (count == min_length) 
+					{
+						threshold = quantile_values[i];
+						cout << "Quantile value at threshold: " << quantile_values[i] << " Normal variate: " <<  normal_variates[i] << endl;
+					}
+					else flag = 0;
+				}
+			}
     }
   }
-  
-  //float mean = get_mean(raster_vector);
-  //float standard_deviation = get_standard_deviation(raster_vector,mean);
-  //float threshold = mean+normal_variates[threshold_index]*standard_deviation;
-  //cout << "Mean: " << mean << " Standard deviation: " << standard_deviation << " Threshold value is: " << threshold << endl;
   
   return threshold;
 }
