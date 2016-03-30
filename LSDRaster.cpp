@@ -186,8 +186,8 @@ void LSDRaster::create(int nrows, int ncols, double xmin, double ymin,
   NCols = ncols;
   XMinimum = xmin;
   YMinimum = ymin;
-  DataResolution = cellsize;
-  NoDataValue = ndv;
+  DataResolution = cellsize;   //Converting double to float?
+  NoDataValue = ndv;     // Converting double to int??!
   
   // Using the <double> data member
   RasterData_dbl = data.copy();
@@ -2522,10 +2522,10 @@ LSDRaster LSDRaster::TopographicShielding(int AzimuthStep, int ZenithStep)
 	Is interfaced through LSDRaster::TopoShield and LSDRaster::Hillshade, and should not 
 	be called directly,	to generate a hillshade use LSDRaster::Hillshade.
 
-	Takes 2 ints, the zenith angle of the illumination source in degrees
+	Takes 2 ints, the zenith angle of the illumination source in degrees from horizontal
 	and the azimuth angle, of the illumination source in degrees.
 
-	Outputs an LSDIndexRaster showing areas in the shadow of other topography.
+	Outputs an LSDRaster showing areas in the shadow of other topography.
 
 	Martin Hurst
 	February 2015
@@ -2534,7 +2534,7 @@ LSDRaster LSDRaster::TopographicShielding(int AzimuthStep, int ZenithStep)
 LSDRaster LSDRaster::CastShadows(int Azimuth, int ZenithAngle)
 {
   Array2D<float> Shadows = this->Shadows(Azimuth,ZenithAngle);
-  return LSDRaster(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, Shadows);
+  return LSDRaster(NRows, NCols, XMinimum, YMinimum, DataResolution, NoDataValue, Shadows,GeoReferencingStrings);
 }
 
 Array2D<float> LSDRaster::Shadows(int Azimuth, int ZenithAngle)
@@ -2559,7 +2559,7 @@ Array2D<float> LSDRaster::Shadows(int Azimuth, int ZenithAngle)
   vector<int> as, bs;
   
   //Convert Azimuth and Zenith to radians
-  float ZenithRadians = (M_PI/180.)*(90.-ZenithAngle);
+  float ZenithRadians = (M_PI/180.)*(ZenithAngle);
   float AzimuthRadians = (M_PI/180.)*(180.-(Azimuth+90.));
   if (AzimuthRadians<0) AzimuthRadians += 2.*M_PI;
 
