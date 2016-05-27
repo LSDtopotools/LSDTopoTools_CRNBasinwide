@@ -124,17 +124,28 @@ def plot_SWE_effD_fit(elevations,SWE_in_effDepth,popt_bl,SWE_bl_fit,RMSE_val):
     ax1.legend(loc='upper left')
 
     
-    #plot_fname = "Fit_plot_bl.png"
-    #plt.savefig(plot_fname, format='png')
-    #plt.clf()
-    plt.show()
+    plot_fname = "Fit_plot_bl.png"
+    plt.savefig(plot_fname, format='png')
+    plt.clf()
+    #plt.show()
 
-
+# This function plots the results from the fitting
+def write_sparam_file(filename,popt_bl):      
+    f = open(filename, 'w')
+    f.write("Bilinear\n")
+    f.write(str(popt_bl[0])+"\n")
+    f.write(str(popt_bl[1])+"\n")
+    f.write(str(popt_bl[2])+"\n")
+    f.write(str(popt_bl[3])+"\n")
+    f.close()
+    
 
 if __name__ == "__main__":
 
     filename = 'T:\\analysis_for_papers\\Manny_idaho\\SWE_idaho.txt'
+    sparamname = 'T:\\analysis_for_papers\\Manny_idaho\\HarringCreek.sparam'
     
     elevations,SWE_in_effDepth,popt_bl,SWE_bl_fit,RMSE_val = fit_bilinear_SWE_from_file(filename)
     plot_SWE_effD_fit(elevations,SWE_in_effDepth,popt_bl,SWE_bl_fit,RMSE_val)
+    write_sparam_file(sparamname,popt_bl)
     
