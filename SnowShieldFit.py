@@ -142,6 +142,8 @@ def write_sparam_file(filename,popt_bl):
 
 if __name__ == "__main__":
 
+    # Change these names to create the parameter file.  The first line is the name
+    # of the data file and the second is the name of the parameter file
     filename = 'T:\\analysis_for_papers\\Manny_idaho\\SWE_idaho.txt'
     sparamname = 'T:\\analysis_for_papers\\Manny_idaho\\HarringCreek.sparam'
     
