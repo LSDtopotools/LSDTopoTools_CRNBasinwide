@@ -135,14 +135,14 @@ class LSDStrahlerLinks
     /// @date 28/10/14
     void calculate_link_area(LSDFlowInfo& FlowInfo);    
 
-    /// @brief this function prints drops
+    /// @brief this function prints drops. Modified FJC 25/03/16.
     /// @param data_directory a string containing the data dierctory. Should be
     ///  terminated with a slash
-    /// @param threshold_string a string that is used to identify the file
-    ///  (typically this will be the drainage area threshold for the sources)
+    /// @param DEM_name a string that is used to identify the file
+    ///  (typically this will be the name of the DEM)
     /// @author SMM
     /// @date 28/10/14
-    void print_drops(string data_directory, string threshold_string);
+    void print_drops(string data_directory, string DEM_name);
 
     /// @brief this function calculates calcualtes which basins contain nodes
     /// that receive flow from nodes on edge or adjacent to nodata
@@ -172,6 +172,28 @@ class LSDStrahlerLinks
     /// @author SMM
     /// @date 01/11/2014
     LSDRaster get_no_edge_influence_raster(LSDFlowInfo& FI, LSDRaster& topography);
+	
+	  /// @brief Function to print the number of streams of each order
+    /// @param data_directory directory to print file to
+		/// @param DEM_name string to identify the file (e.g. the name of the DEM)
+    /// @author FJC and MAH
+    /// @date 17/03/16
+    void print_number_of_streams(string data_directory, string DEM_name);
+    
+    /// @brief Function to calculate the length of each link of each order
+    /// @param FlowInfo LSDFlowInfo object 
+    /// @author FJC and MAH
+    /// @date 24/03/16
+    void calculate_lengths(LSDFlowInfo& FlowInfo);
+	
+	  /// @brief this function prints the lengths. Creates a different file for each stream order.
+    /// @param data_directory a string containing the data dierctory. Should be
+    ///  terminated with a slash
+    /// @param DEM_name a string that is used to identify the file
+    ///  (typically this will be the name of the DEM)
+    /// @author FJC
+    /// @date 25/03/16
+    void print_lengths(string data_directory, string DEM_name);
 
 
   protected:
@@ -223,7 +245,10 @@ class LSDStrahlerLinks
     vector< vector<int> > ReceiverCols;  
     
     /// a vec vec containing drops of every link
-    vector< vector<float> > DropData;      
+    vector< vector<float> > DropData;   
+    
+    /// a vec vec containing lengths of every link - added FJC 24/03/16
+    vector< vector<float> > LengthData;    
  
     
   private:

@@ -143,8 +143,7 @@ void LSDStrahlerLinks::create(LSDJunctionNetwork& JNetwork, LSDFlowInfo& FlowInf
   while(NThisOrderSources>0)
   {
   
-     cout << "This stream order is: " << SO << " and the number of sources is: " 
-          << NThisOrderSources << endl;
+     //cout << "This stream order is: " << SO << " and the number of sources is: " << NThisOrderSources << endl;
      SO++;
   
     // reset the sources and receivers
@@ -171,7 +170,7 @@ void LSDStrahlerLinks::create(LSDJunctionNetwork& JNetwork, LSDFlowInfo& FlowInf
       SJunctions.push_back(thinnedSources);
       RJunctions.push_back(thisOrderReceivers);
       
-      cout <<"Order: " << SO-1 << " NS: " << SJunctions[SO-2].size() << " and NR: " << RJunctions[SO-2].size() << endl;
+      //cout <<"Order: " << SO-1 << " NS: " << SJunctions[SO-2].size() << " and NR: " << RJunctions[SO-2].size() << endl;
       
       // now sort and then loop through receivers to get the sources for the next
       // stream order.
@@ -180,12 +179,29 @@ void LSDStrahlerLinks::create(LSDJunctionNetwork& JNetwork, LSDFlowInfo& FlowInf
       
       // reset the sources 
       thisOrderSources = emptyvec;
-      
+			
+			// remove any receivers that have a stream order more than 1 greater than the order you are checking
+			vector<int> NewReceivers;
+			for (int r = 0; r < NReceivers; r++)
+			{
+				int ReceiverSO = JNetwork.get_StreamOrder_of_Junction(FlowInfo, thisOrderReceivers[r]);
+				if (ReceiverSO == SO)
+				{
+          int same_SO = JNetwork.check_stream_order_of_upstream_nodes(thisOrderReceivers[r], FlowInfo);
+          if (same_SO == 0)
+          {
+				    NewReceivers.push_back(thisOrderReceivers[r]);
+          }
+				}
+			}
+		
+			NReceivers = int(NewReceivers.size());
+			
       // get the starting receiver
       int LastReceiver;
       if (NReceivers > 0)
       {
-        LastReceiver = thisOrderReceivers[0];
+				LastReceiver = NewReceivers[0];
         thisOrderSources.push_back(LastReceiver);
       }
           
@@ -195,13 +211,14 @@ void LSDStrahlerLinks::create(LSDJunctionNetwork& JNetwork, LSDFlowInfo& FlowInf
         for(int r = 1; r<NReceivers; r++)
         {
           // check to see if it is a new receiver
-          if(thisOrderReceivers[r] != LastReceiver)
-          {
-            LastReceiver = thisOrderReceivers[r];
+					if(NewReceivers[r] != LastReceiver)
+					{
+						LastReceiver = NewReceivers[r];
             thisOrderSources.push_back(LastReceiver);
           }                  
         }
       }
+      
       
       NThisOrderSources = int(thisOrderSources.size());
     }
@@ -227,7 +244,7 @@ void LSDStrahlerLinks::create(LSDJunctionNetwork& JNetwork, LSDFlowInfo& FlowInf
          << " and n receivers: " << ReceiverJunctions[o].size() << endl;
   }
   cout << "Total sources: " << t_sources << endl;
-
+  
   // now get the nodes of the sources and recievers
   populate_NodeRowCol_vecvecs(JNetwork, FlowInfo);
                                 
@@ -384,7 +401,7 @@ void LSDStrahlerLinks::calculate_drops(LSDFlowInfo& FlowInfo, LSDRaster& topo_ra
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // This function prints the drops for assimilation into R or python
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-void LSDStrahlerLinks::print_drops(string data_directory, string threshold_string)
+void LSDStrahlerLinks::print_drops(string data_directory, string DEM_name)
 {
   int NOrders = int(DropData.size()); 
   string fname;
@@ -398,8 +415,8 @@ void LSDStrahlerLinks::print_drops(string data_directory, string threshold_strin
   {
     for(int order = 0; order<NOrders; order++)
     {
-      order_string = itoa(order);
-      fname = data_directory+"Drops_Order_"+order_string+ "_Thresh_"+threshold_string;
+      order_string = itoa(order+1);
+      fname = data_directory+"Drops_Order_"+order_string+"_"+DEM_name+".txt";
       cout << "fname is: " << fname << endl;
       
       ofstream drops_out;
@@ -527,6 +544,161 @@ LSDRaster LSDStrahlerLinks::get_no_edge_influence_raster(LSDFlowInfo& FI,
   return masked_topography;
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// This function prints the number of streams for each stream order
+// FJC and MAH 17/03/16
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDStrahlerLinks::print_number_of_streams(string data_directory, string DEM_name)
+{
+  vector<int> number_streams;
+	int SO = 1;
+	
+	string fname = data_directory+"Number_Streams_"+DEM_name+".txt";
+	ofstream output_file;
+	output_file.open(fname.c_str());
+	cout << "fname is: " << fname << endl;
+  
+  for (int i =0; i < int(SourceJunctions.size()); i++)
+  {
+    number_streams.push_back(int(SourceJunctions[i].size()));
+    output_file << SO << " " << SourceJunctions[i].size() << endl;
+		SO++;
+  }
+	output_file.close(); 
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// This function gets the length of streams for each stream order
+// FJC and MAH 24/03/16
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDStrahlerLinks::calculate_lengths(LSDFlowInfo& FlowInfo)
+{
+  vector< vector<float> > lengths;
+  vector<float> this_length;
+  vector<float> empty_vec;
+  
+  int ThisNode, EndNode, FLCode;
+  float node_length = 0;
+  
+  // get the number of orders
+  int NOrders = int(SourceJunctions.size());
+  
+  // loop through orders collecting data
+  for (int order = 0; order<NOrders; order++)
+  { 
+    int n_links_in_order = int(SourceJunctions[order].size());
+    
+    // reset drop vector
+    this_length = empty_vec;   
+    //loop through each link and get the flow lengths
+    for(int link = 0; link<n_links_in_order; link++)
+    {
+      float link_length = 0;
+      int receiver_node, receiver_row, receiver_col;
+      ThisNode = SourceNodes[order][link];
+      EndNode = ReceiverNodes[order][link];
+      //move downstream from the source node
+      while(ThisNode != EndNode)
+      {
+        // get the flow length code: 1 if cardinal direction, 2 if diagonal, 0 if base level
+        FLCode = FlowInfo.retrieve_flow_length_code_of_node(ThisNode);
+        // check cardinal direction
+        if(FLCode == 1)
+        {
+          node_length = DataResolution; 
+        }
+        // check diagonal direction
+        if(FLCode == 2)
+        {
+          node_length = DataResolution*(1/sqrt(2));
+        }
+        // check base level direction
+        if(FLCode == 0)
+        {
+          node_length = 0;
+        }
+        link_length = link_length+node_length;
+        FlowInfo.retrieve_receiver_information(ThisNode, receiver_node, receiver_row, receiver_col);
+        ThisNode = receiver_node;
+      }
+
+      // Get the last node to junction
+      // get the flow length code: 1 if cardinal direction, 2 if diagonal, 0 if base level
+      FLCode = FlowInfo.retrieve_flow_length_code_of_node(ThisNode);
+      // check cardinal direction
+      if(FLCode == 1)
+      {
+        node_length = DataResolution; 
+      }
+      // check diagonal direction
+      if(FLCode == 2)
+      {
+        node_length = DataResolution*(1/sqrt(2));
+      }
+      // check base level direction
+      if(FLCode == 0)
+      {
+        node_length = 0;
+      }
+      link_length = link_length+node_length;
+      //cout << "link_length = " << link_length << endl;
+      FlowInfo.retrieve_receiver_information(ThisNode, receiver_node, receiver_row, receiver_col);
+      this_length.push_back(link_length); 
+    }
+    
+    // add the length vector to the vecvec
+    lengths.push_back(this_length);
+  }
+  
+  LengthData = lengths;
+    
+}                                                   
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// This function prints the lengths for assimilation into R or python
+// FJC 25/03/16
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDStrahlerLinks::print_lengths(string data_directory, string DEM_name)
+{
+  int NOrders = int(LengthData.size()); 
+  string fname;
+  string order_string;
+
+  if (NOrders == 0)
+  {
+    cout << "You haven't calculated the lengths yet! Not printing" << endl; 
+  }
+  else
+  {
+    for(int order = 0; order<NOrders; order++)
+    {
+      order_string = itoa(order+1);
+      fname = data_directory+"Lengths_Order_"+order_string+"_"+DEM_name+".txt";
+      cout << "fname is: " << fname << endl;
+      
+      ofstream lengths_out;
+      lengths_out.open(fname.c_str());
+      
+      int n_links_in_order = int(LengthData[order].size());
+    
+      for(int link = 0; link<n_links_in_order; link++)
+      {
+      	lengths_out << LengthData[order][link] << endl;
+      }
+      lengths_out.close(); 
+    
+    }
+  }
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
 
 
 #endif
