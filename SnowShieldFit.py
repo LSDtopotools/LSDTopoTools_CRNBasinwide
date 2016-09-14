@@ -78,9 +78,17 @@ def fit_bilinear_SWE_from_file(filename):
     index_PE = np.argmax(SWE_in_effDepth)
     test_peak_elevation = elevations[index_PE]
     elev_max =  np.amax(elevations) 
-    elev_min =  np.amin(elevations)    
-    test_ascend = test_peak/(test_peak_elevation-elev_min)
-    test_descend = test_peak/(test_peak_elevation-elev_max)
+    elev_min =  np.amin(elevations)
+
+    if (test_peak_elevation-elev_min) == 0:
+        test_ascend = 0
+    else:
+        test_ascend = test_peak/(test_peak_elevation-elev_min)
+        
+    if (test_peak_elevation-elev_max) == 0:
+        test_descend = 0
+    else:
+        test_descend = test_peak/(test_peak_elevation-elev_max)
         
     # new initial guess    
     initial_guess = [test_ascend,test_descend,test_peak_elevation,test_peak]
@@ -125,9 +133,9 @@ def plot_SWE_effD_fit(elevations,SWE_in_effDepth,popt_bl,SWE_bl_fit,RMSE_val):
 
     
     plot_fname = "Fit_plot_bl.png"
-    plt.savefig(plot_fname, format='png')
+    plt.savefig(plot_fname, format='png')  
+    plt.show()
     plt.clf()
-    #plt.show()
 
 # This function plots the results from the fitting
 def write_sparam_file(filename,popt_bl):      
@@ -144,8 +152,8 @@ if __name__ == "__main__":
 
     # Change these names to create the parameter file.  The first line is the name
     # of the data file and the second is the name of the parameter file
-    filename = 'T:\\analysis_for_papers\\Manny_idaho\\SWE_idaho.txt'
-    sparamname = 'T:\\analysis_for_papers\\Manny_idaho\\HarringCreek.sparam'
+    filename = 'T:\\analysis_for_papers\\Delunel\\Data.txt'
+    sparamname = 'T:\\analysis_for_papers\\Delunel\\Delunel.sparam'
     
     elevations,SWE_in_effDepth,popt_bl,SWE_bl_fit,RMSE_val = fit_bilinear_SWE_from_file(filename)
     plot_SWE_effD_fit(elevations,SWE_in_effDepth,popt_bl,SWE_bl_fit,RMSE_val)
