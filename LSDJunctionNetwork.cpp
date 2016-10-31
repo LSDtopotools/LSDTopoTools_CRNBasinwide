@@ -5078,7 +5078,7 @@ void LSDJunctionNetwork::snap_point_locations_to_channels(vector<float> x_locs,
     {
       //cout << "JN 4307 This point is in the raster!" << endl;
       this_chan_node = get_nodeindex_of_nearest_channel_for_specified_coordinates(x_loc, y_loc,
-                       threshold_stream_order, search_radius_nodes,
+                       search_radius_nodes, threshold_stream_order,
                        FlowInfo);
       //cout << "JN 431 Got channel!, channel node is: " << this_chan_node << endl;                 
                        
