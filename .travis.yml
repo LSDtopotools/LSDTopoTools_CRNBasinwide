@@ -14,5 +14,5 @@ script:
   - make -f Shielding_for_CRN.make
   - make -f TopoShielding.make
   - make -f Spawn_DEMs_for_CRN.make
-  - make -f Soil_cosmogenic_analysis.make
+  - make -f Soil_CRN.make
   
