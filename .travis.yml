@@ -1,0 +1,18 @@
+dist: trusty
+sudo: required
+language:
+  - cpp
+compiler:
+  - gcc
+before_install:
+  - cd driver_functions_CRNBasinwide
+script:
+  # Run your build commands next
+  - make -f Basinwide_CRN.make
+  - make -f Check_CRN_basins.make
+  - make -f Nested_CRN.make
+  - make -f Shielding_for_CRN.make
+  - make -f TopoShielding.make
+  - make -f Spawn_DEMs_for_CRN.make
+  - make -f Soil_cosmogenic_analysis.make
+  
