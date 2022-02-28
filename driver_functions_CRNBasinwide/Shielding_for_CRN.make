@@ -19,6 +19,8 @@ SOURCES=Shielding_for_CRN.cpp \
         ../LSDBasin.cpp \
         ../LSDParticle.cpp \
         ../LSDCRNParameters.cpp \
+        ../LSDRasterMaker.cpp \
+        ../LSDSpatialCSVReader.cpp \
         ../LSDCosmoData.cpp \
         ../LSDRasterInfo.cpp
 OBJECTS=$(SOURCES:.cpp=.o)

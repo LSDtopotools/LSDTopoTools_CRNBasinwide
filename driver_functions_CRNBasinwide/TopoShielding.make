@@ -15,6 +15,8 @@ SOURCES= TopographicShielding.cpp \
         ../LSDStatsTools.cpp \
         ../LSDBasin.cpp \
         ../LSDShapeTools.cpp \
+        ../LSDRasterMaker.cpp \
+        ../LSDSpatialCSVReader.cpp \
         ../LSDParticle.cpp \
         ../LSDCRNParameters.cpp
 OBJECTS=$(SOURCES:.cpp=.o)

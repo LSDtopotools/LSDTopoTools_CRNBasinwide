@@ -20,6 +20,8 @@ SOURCES=Basinwide_cosmogenic_analysis.cpp \
         ../LSDParticle.cpp \
         ../LSDCRNParameters.cpp \
         ../LSDCosmoData.cpp \
+        ../LSDRasterMaker.cpp \
+        ../LSDSpatialCSVReader.cpp \
         ../LSDRasterInfo.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 EXECUTABLE=Basinwide_CRN.exe

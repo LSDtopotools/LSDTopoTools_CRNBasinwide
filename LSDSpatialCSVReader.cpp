@@ -50,6 +50,7 @@
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 #include <fstream>
 #include <cmath>
+#include <iomanip>
 #include <iostream>
 #include <map>
 #include <string>
@@ -57,6 +58,7 @@
 #include <sstream>
 #include <algorithm>
 #include <vector>
+#include <utility>
 #include "LSDStatsTools.hpp"
 #include "LSDShapeTools.hpp"
 #include "LSDCosmoData.hpp"
@@ -229,7 +231,7 @@ void LSDSpatialCSVReader::load_csv_data(string filename)
 
   // create a stringstream
   stringstream ss(line_from_file);
-  ss.precision(9);
+  ss.precision(14);
 
   while( ss.good() )
   {
@@ -252,7 +254,7 @@ void LSDSpatialCSVReader::load_csv_data(string filename)
   int longitude_index = -9999;
   for (int i = 0; i<n_headers; i++)
   {
-    cout << "This header is: " << this_string_vec[i] << endl;
+    //cout << "This header is: " << this_string_vec[i] << endl;
     if (this_string_vec[i]== "latitude" || this_string_vec[i] == "Latitude" || this_string_vec[i] == "lat" || this_string_vec[i] == "Lat")
     {
       latitude_index = i;
@@ -407,6 +409,84 @@ bool LSDSpatialCSVReader::check_if_all_data_columns_same_length()
 //==============================================================================
 
 
+//==============================================================================
+// Some functions to check the data members
+//==============================================================================
+bool LSDSpatialCSVReader::add_data_column(string column_name, vector<string> column_data)
+{
+
+  bool added_column_works = false;
+  int n_lat,n_col;
+
+  n_lat = int(latitude.size());
+
+  n_col = int(column_data.size());
+
+  if(n_lat == n_col)
+  {
+    data_map[column_name] = column_data;
+  }
+  else
+  {
+    cout << "The data column is not the same size as the other columns. The addition of this column has failed" << endl;
+  }
+
+  return added_column_works;
+
+}
+//==============================================================================
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// Checks if a column is in the csv
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+bool LSDSpatialCSVReader::is_column_in_csv(string column_name)
+{
+  bool is_in_csv = false;
+  if ( data_map.find(column_name) == data_map.end() )
+  {
+    // not found
+    cout << "I'm afraid the column "<< column_name << " is not in this dataset" << endl;
+  }
+  else
+  {
+    is_in_csv = true;
+  }
+  return  is_in_csv;
+}
+
+string LSDSpatialCSVReader::find_string_in_column_name(string column_name_fragment)
+{
+  
+  string column_name = "NULL";
+  string this_key;
+  int column_count = 0;
+  for( map<string, vector<string> >::iterator it = data_map.begin(); it != data_map.end(); ++it)
+  {
+    this_key = it->first;
+    if (this_key.find(column_name_fragment) != std::string::npos) 
+    {
+      column_name = this_key;
+      column_count++;
+    }
+  }
+
+  if(column_count == 0)
+  {
+    cout << "I didn't find the string fragment. Returning a null column name." << endl;
+    cout << "Check if the fragment has a matching case." << endl;
+  }
+  if(column_count > 1)
+  {
+    cout << "I found more than one column names with that string fragment!" << endl;
+  }
+  return  column_name;
+}
+
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
 // This returns the string vector of data from a given column name
@@ -501,7 +581,7 @@ vector<float> LSDSpatialCSVReader::data_column_to_float(string column_name)
   return float_vec;
 }
 
-// Converts a data column to a float vector
+// Converts a data column to a double vector
 vector<int> LSDSpatialCSVReader::data_column_to_int(string column_name)
 {
   vector<string> string_vec = get_data_column(column_name);
@@ -518,7 +598,7 @@ vector<int> LSDSpatialCSVReader::data_column_to_int(string column_name)
   return int_vec;
 }
 
-// Converts a data column to a float vector
+// Converts a data column to a double vector
 vector<double> LSDSpatialCSVReader::data_column_to_double(string column_name)
 {
   vector<string> string_vec = get_data_column(column_name);
@@ -533,6 +613,175 @@ vector<double> LSDSpatialCSVReader::data_column_to_double(string column_name)
     double_vec.push_back( atof(string_vec[i].c_str()));
   }
   return double_vec;
+}
+
+// Adds a float to a data column
+void LSDSpatialCSVReader::data_column_add_float(string column_name, float add_value)
+{
+  //cout << "Adding " << add_value << " to the column " << column_name << endl;
+  vector<string> string_vec = get_data_column(column_name);
+  float this_value;
+  vector<string> new_string_vec;
+  int N_data_elements = string_vec.size();
+  if (N_data_elements == 0)
+  {
+    cout << "Couldn't read in the data column. Check the column name!" << endl;
+  }
+  for(int i = 0; i<N_data_elements; i++)
+  {
+
+    this_value = atof(string_vec[i].c_str())+add_value;
+
+    //if (i< 10)
+    //{
+    // cout << "Orig: " << atof(string_vec[i].c_str()) << " final " << this_value << endl;
+    //}
+
+    new_string_vec.push_back(to_string(this_value));
+  }
+  data_map[column_name] = new_string_vec;
+}
+
+
+// Adds a float to a data column
+void LSDSpatialCSVReader::data_column_add_float(string column_name, vector<float> add_value)
+{
+  //cout << "Adding " << add_value << " to the column " << column_name << endl;
+  vector<string> string_vec = get_data_column(column_name);
+  float this_value;
+  vector<string> new_string_vec;
+  int N_data_elements = string_vec.size();
+
+  if (N_data_elements != int( add_value.size()))
+  {
+    cout << "Can't add vectors of different size to csv object" << endl;
+    exit(0);
+  }
+
+  if (N_data_elements == 0)
+  {
+    cout << "Couldn't read in the data column. Check the column name!" << endl;
+  }
+  for(int i = 0; i<N_data_elements; i++)
+  {
+
+    this_value = atof(string_vec[i].c_str())+add_value[i];
+
+    //if (i< 10)
+    //{
+    // cout << "Orig: " << atof(string_vec[i].c_str()) << " final " << this_value << endl;
+    //}
+
+    new_string_vec.push_back(to_string(this_value));
+  }
+  data_map[column_name] = new_string_vec;
+}
+
+
+
+
+// Adds a float to a data column
+void LSDSpatialCSVReader::data_column_replace(string column_name, vector<float> new_column)
+{
+  // cout << "Adding " << add_value << " to the column " << column_name << endl;
+  vector<string> string_vec = get_data_column(column_name);
+  float this_value;
+  vector<string> new_string_vec;
+  int N_data_elements = string_vec.size();
+  if (N_data_elements == 0)
+  {
+    cout << "Couldn't read in the data column. Check the column name!" << endl;
+  }
+
+  if (N_data_elements != int(new_column.size()))
+  {
+    cout << "You are trying to replace a data column using a column that is a different size. " << endl;
+    cout << "I'm afraid I can't do that." << endl;
+    cout << "Aborting replace." << endl;
+  }
+  else
+  {
+    for(int i = 0; i<N_data_elements; i++)
+    {
+      new_string_vec.push_back(to_string(new_column[i]));
+    }
+    data_map[column_name] = new_string_vec;
+  }
+  
+
+}
+
+
+// Multiplies values in a data column
+void LSDSpatialCSVReader::data_column_multiply_float(string column_name, float multiply_value)
+{
+  vector<string> string_vec = get_data_column(column_name);
+  float this_value;
+  vector<string> new_string_vec;
+  int N_data_elements = string_vec.size();
+  if (N_data_elements == 0)
+  {
+    cout << "Couldn't read in the data column. Check the column name!" << endl;
+  }
+  for(int i = 0; i<N_data_elements; i++)
+  {
+    this_value = atof(string_vec[i].c_str())*multiply_value;
+    new_string_vec.push_back(to_string(this_value));
+  }
+  data_map[column_name] = new_string_vec;
+}
+
+// This is very specific: it enforces a slope for a particular data colum
+void LSDSpatialCSVReader::enforce_slope(string fd_column_name, string elevation_column_name, float minimum_slope)
+{
+  double min_slope = double(minimum_slope);
+  cout << "I am going to enforce a minimum slope." << endl;
+  vector<double> flow_distance = data_column_to_double(fd_column_name);
+  vector<double> elevation = data_column_to_double(elevation_column_name);
+
+  // the single channel starts from the top, so the last node is the base level and doesn't get modified.
+  int N_data_elements = int(flow_distance.size());
+  vector<double> new_elevation = elevation;
+  float dist, min_elev;
+
+  cout.precision(9);
+
+  //cout << "Minimum slope is: " << min_slope << endl;
+  for (int i = N_data_elements-2; i>=0; i--)
+  {
+    dist = flow_distance[i]-flow_distance[i+1];
+
+    min_elev = dist*min_slope+new_elevation[i+1];
+    cout << "dist: " << dist << " z[i+1]: " << new_elevation[i+1] << " z[i]: " << elevation[i] << " min_elev: " << min_elev << endl;
+    if (dist < 0 || fabs(dist) >128)
+    {
+      cout << "There seems to be a big changes in flow distance (greater than a diagonal pixel at 90m resolution" << endl;
+      cout << "I am considering this a new channel and resetting the elevation values to this pixel" << endl;
+      new_elevation[i] = elevation[i];
+    }
+    else
+    {
+      if (elevation[i] < min_elev)
+      {
+        cout << "Found something where I need to increase slope!" << endl;
+        new_elevation[i] = min_elev;
+      }
+      else
+      {
+        new_elevation[i] = elevation[i];
+      }
+    }
+
+  }
+
+  vector<string> new_elev_string;
+  for(int i = 0; i< N_data_elements; i++)
+  {
+    new_elev_string.push_back(to_string(new_elevation[i]));
+  }
+
+  data_map[elevation_column_name] = new_elev_string;
+
 }
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -804,19 +1053,22 @@ void LSDSpatialCSVReader::burn_raster_data_to_csv(LSDRaster& ThisRaster,string c
   vector<string> new_column_data;
 
   // The csv file needs to have lat-long data
-  if (not check_if_latitude_and_longitude_exist())
+  if (check_if_latitude_and_longitude_exist() == false)
   {
     cout << "You must have lat-long data for burning to work. " << endl;
     exit(EXIT_FAILURE);
   }
   else
   {
-    //cout << "Let me get the x and y data." << endl;
+    cout << "Let me get the x and y data." << endl;
     get_x_and_y_from_latlong(UTME,UTMN);
+    cout << "Got the x and y" << endl;
+
     int n_nodes = int(UTME.size());
     for(int i = 0; i<n_nodes; i++)
     {
       stringstream s;
+      s.precision(9);
       this_UTME = UTME[i];
       this_UTMN = UTMN[i];
 
@@ -843,7 +1095,7 @@ void LSDSpatialCSVReader::burn_raster_data_to_csv(LSDIndexRaster& ThisRaster,str
   vector<string> new_column_data;
 
   // The csv file needs to have lat-long data
-  if (not check_if_latitude_and_longitude_exist())
+  if (check_if_latitude_and_longitude_exist() == false)
   {
     cout << "You must have lat-long data for burning to work. " << endl;
     exit(EXIT_FAILURE);
@@ -904,6 +1156,11 @@ void LSDSpatialCSVReader::check_if_points_are_in_raster()
   is_point_in_raster = temp_is_point_in_raster;
 }
 
+vector<bool> LSDSpatialCSVReader::get_if_points_are_in_raster_vector()
+{
+  return is_point_in_raster;
+}
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 //
 // Function to get vectors of x and y coordinates, and the node indices of these
@@ -935,6 +1192,7 @@ void LSDSpatialCSVReader::get_nodeindices_from_x_and_y_coords(LSDFlowInfo& FlowI
 }
 
 // get the node indices from lat-long coords in the csv file
+// If the nodeindex is nodata it will return nodatavalue
 vector<int> LSDSpatialCSVReader::get_nodeindices_from_lat_long(LSDFlowInfo& FlowInfo)
 {
   vector<int> NIs;
@@ -943,11 +1201,173 @@ vector<int> LSDSpatialCSVReader::get_nodeindices_from_lat_long(LSDFlowInfo& Flow
   for (int i = 0; i < int(X_coords.size()); i++)
   {
     int NodeIndex = FlowInfo.get_node_index_of_coordinate_point(X_coords[i], Y_coords[i]);
-    NIs.push_back(NodeIndex);
+    if (NodeIndex != NoDataValue) {
+      NIs.push_back(NodeIndex);
+    }
   }
 
   return NIs;
 
+}
+
+void LSDSpatialCSVReader::add_nodeindex_vector_to_data_map_using_lat_long(LSDFlowInfo& FlowInfo)
+{
+  vector<int> NIs;
+  vector<string> NI_strings;
+  vector<float> X_coords, Y_coords;
+  get_x_and_y_from_latlong(X_coords,Y_coords);
+  for (int i = 0; i < int(X_coords.size()); i++)
+  {
+    int NodeIndex = FlowInfo.get_node_index_of_coordinate_point(X_coords[i], Y_coords[i]);
+    NIs.push_back(NodeIndex);
+    NI_strings.push_back(itoa(NodeIndex));
+  }
+
+  string nistr1 = "nodeindex";
+  add_data_column( nistr1, NI_strings);
+}
+
+
+
+vector<int> LSDSpatialCSVReader::get_nodeindex_vector()
+{
+  vector<int> ni_vec;
+
+  bool is_nodeindex = false;
+  bool is_id = false;
+  bool is_node = false;
+
+  //bool ni_exists = false;
+
+  string nistr1 = "nodeindex";
+  string nistr2 = "node";
+  string nistr3 = "id";
+  string ni_column = nistr1;
+
+  // Because we have been sloppy, the nodeindex can appear in csv files as "id", "node", or "nodeindex"
+  // we check for all three of these
+
+  cout << "The column headers are: " << endl;
+  print_data_map_keys_to_screen();
+
+  cout << "Checking columns to find node index" << endl;
+  is_nodeindex = is_column_in_csv(nistr1);
+  is_node = is_column_in_csv(nistr2);
+  is_id = is_column_in_csv(nistr3);
+  cout << "Okay, done checking columns." << endl;
+
+  if ( is_nodeindex == false &&  is_node == false &&  is_id == false)
+  {
+    cout << "I could not find a nodeindex column. Returning and empty map." << endl;
+  }
+  else
+  {
+    // This load of switches basically says that the order of preference if there are
+    // more than one liklely columns is nodeindex, node, id.
+    if (is_nodeindex)
+    {
+      ni_column = nistr1;
+    }
+    else
+    {
+      if (is_node)
+      {
+        ni_column = nistr2;
+      }
+      else
+      {
+        cout << "I found the code 'id'" << endl;
+        ni_column = nistr3;
+      }
+    }
+
+    // now get the data
+    cout << "Grabbing the data from columns " << ni_column << endl;
+    ni_vec = data_column_to_int(ni_column);
+  }
+
+  return ni_vec;
+}
+
+// This uses a nodeindex colum and creates a data map with the column data
+map<int,float> LSDSpatialCSVReader::get_nodeindex_map_float(string column_name)
+{
+  map<int,float> nodeindex_map;
+
+  bool is_nodeindex = false;
+  bool is_id = false;
+  bool is_node = false;
+
+  //bool ni_exists = false;
+
+  string nistr1 = "nodeindex";
+  string nistr2 = "node";
+  string nistr3 = "id";
+  string ni_column = nistr1;
+
+  // Because we have been sloppy, the nodeindex can appear in csv files as "id", "node", or "nodeindex"
+  // we check for all three of these
+
+  cout << "The column headers are: " << endl;
+  print_data_map_keys_to_screen();
+
+  cout << "Checking columns to find node index" << endl;
+  is_nodeindex = is_column_in_csv(nistr1);
+  is_node = is_column_in_csv(nistr2);
+  is_id = is_column_in_csv(nistr3);
+  cout << "Okay, done checking columns." << endl;
+
+  cout << "The column name is: " << column_name << endl;
+  bool is_data_column = is_column_in_csv(column_name);
+
+  if (is_data_column == false)
+  {
+    cout << "I can't find your data column" << endl;
+  }
+  else
+  {
+    cout << "I found your data column." << endl;
+    if (is_nodeindex == false && is_node == false && is_id == false)
+    {
+      cout << "I could not find a nodeindex column. Returning and empty map." << endl;
+    }
+    else
+    {
+      // This load of switches basically says that the order of preference if there are
+      // more than one liklely columns is nodeindex, node, id.
+      if (is_nodeindex)
+      {
+        ni_column = nistr1;
+      }
+      else
+      {
+        if (is_node)
+        {
+          ni_column = nistr2;
+        }
+        else
+        {
+          cout << "I found the code 'id'" << endl;
+          ni_column = nistr3;
+        }
+      }
+
+      // now get the data
+      cout << "Grabbing the data from columns " << ni_column << " and " << column_name << endl;
+      vector<int> ni_vec = data_column_to_int(ni_column);
+      vector<float> data_vec = data_column_to_float(column_name);
+
+      // now make the map
+      for (int i = 0; i< int(ni_vec.size()); i++)
+      {
+        nodeindex_map[ ni_vec[i] ] = data_vec[i];
+      }
+
+    }
+  }
+
+
+  return nodeindex_map;
 }
 
 
@@ -1075,6 +1495,69 @@ void LSDSpatialCSVReader::print_lat_long_to_screen(bool only_print_in_raster)
   }
 }
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// Gets the row and column of a point
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDSpatialCSVReader::get_row_and_col_of_a_point(float X_coordinate,float Y_coordinate,int& row, int& col)
+{
+  int this_row = NoDataValue;
+  int this_col = NoDataValue;
+
+  // Shift origin to that of dataset
+  float X_coordinate_shifted_origin = X_coordinate - XMinimum;
+  float Y_coordinate_shifted_origin = Y_coordinate - YMinimum;
+
+  // Get row and column of point
+  int col_point = int(X_coordinate_shifted_origin/DataResolution);
+  int row_point = (NRows - 1) - int(ceil(Y_coordinate_shifted_origin/DataResolution)-0.5);
+
+  //cout << "Getting row and col, " << row_point << " " << col_point << endl;
+
+  if(col_point >= 0 && col_point <= NCols-1)
+  {
+    this_col = col_point;
+  }
+  if(row_point >= 0 && row_point <= NRows -1)
+  {
+    this_row = row_point;
+  }
+
+  row = this_row;
+  col = this_col;
+}
+
+void LSDSpatialCSVReader::get_row_and_col_of_a_point(double X_coordinate,double Y_coordinate,int& row, int& col)
+{
+  int this_row = NoDataValue;
+  int this_col = NoDataValue;
+
+  // Shift origin to that of dataset
+  double X_coordinate_shifted_origin = X_coordinate - XMinimum;
+  double Y_coordinate_shifted_origin = Y_coordinate - YMinimum;
+
+  // Get row and column of point
+  int col_point = int(X_coordinate_shifted_origin/DataResolution);
+  int row_point = (NRows - 1) - int(ceil(Y_coordinate_shifted_origin/DataResolution)-0.5);
+
+  //cout << "Getting row and col, " << row_point << " " << col_point << endl;
+
+  if(col_point >= 0 && col_point <= NCols-1)
+  {
+    this_col = col_point;
+  }
+  if(row_point >= 0 && row_point <= NRows -1)
+  {
+    this_row = row_point;
+  }
+
+  row = this_row;
+  col = this_col;
+}
+
+
+
 //==============================================================================
 // This prints the UTM coordinates to csv for checking
 // FJC 03/03/17
@@ -1093,6 +1576,37 @@ void LSDSpatialCSVReader::print_UTM_coords_to_csv(vector<float> UTME, vector<flo
   outfile.close();
 }
 
+//==============================================================================
+// This prints the UTM coordinates to csv for checking
+// SMM 30/09/2020
+//==============================================================================
+void LSDSpatialCSVReader::print_row_and_col_to_csv(string csv_outname)
+{
+  ofstream outfile;
+  outfile.open(csv_outname.c_str());
+
+  int rf,rd,cf,cd;
+
+
+  vector<float> UTME, UTMN;
+  get_x_and_y_from_latlong(UTME,UTMN);
+
+
+
+  outfile << "Easting, Norting, row_float,col_float,row_double,col_double" << endl;
+  outfile.precision(9);
+  for (int i = 0; i < int(latitude.size()); i++)
+  {
+
+    get_row_and_col_of_a_point(UTME[i],UTMN[i],rf,cf);
+    get_row_and_col_of_a_point(double(UTME[i]),double(UTMN[i]),rd,cd);
+    outfile << UTME[i] << "," << UTMN[i] << "," << rf << "," << cf << "," << rd << "," << cd << endl;
+  }
+  outfile.close();
+}
+
+
+
 
 //==============================================================================
 // This prints a new csv name
@@ -1100,6 +1614,15 @@ void LSDSpatialCSVReader::print_UTM_coords_to_csv(vector<float> UTME, vector<flo
 void LSDSpatialCSVReader::print_data_to_csv(string csv_outname)
 {
   ofstream outfile;
+
+  // make sure the file has the csv extension
+  string ext_str = ".csv";
+  if (csv_outname.find(ext_str) == std::string::npos) 
+  {
+    csv_outname = csv_outname + ext_str;
+  }
+
+
   outfile.open(csv_outname.c_str());
 
   outfile << "latitude,longitude";
@@ -1187,7 +1710,16 @@ void LSDSpatialCSVReader::print_data_to_geojson(string json_outname)
       }
       string fourth_bit = " }, \"geometry\": { \"type\": \"Point\", \"coordinates\": [ ";
       //string fifth_bit = dtoa(this_longitude) +","+ dtoa(latitude[i]) +" ] } },";
-      string fifth_bit = " ] } },";
+
+      string fifth_bit;
+      if (i == (n_nodes-1) )
+      {
+        fifth_bit = " ] } }";
+      }
+      else
+      {
+        fifth_bit = " ] } },";
+      }
 
       outfile << first_bit << latitude[i] << second_bit << this_longitude
               << third_bit+fourth_bit << this_longitude << "," << latitude[i] << fifth_bit
@@ -1207,6 +1739,289 @@ void LSDSpatialCSVReader::print_data_to_geojson(string json_outname)
 
 
 }
+
+void LSDSpatialCSVReader::print_data_to_geojson_linestring(string json_outname)
+{
+  // the file will be projected in WGS84 so you need lat-long coordinates
+  if (check_if_latitude_and_longitude_exist())
+  {
+    ofstream outfile;
+    outfile.precision(9);
+    outfile.open(json_outname.c_str());
+
+    outfile << "{" << endl;
+    outfile << "\"type\": \"FeatureCollection\"," << endl;
+    outfile << "\"crs\": { \"type\": \"name\", \"properties\": { \"name\": \"urn:ogc:def:crs:OGC:1.3:CRS84\" } }," << endl;
+    outfile << "\"features\": [" << endl;
+
+    int n_nodes = int(latitude.size());
+    for(int i = 0; i< n_nodes-1; i++)
+    {
+      double this_longitude, next_longitude;
+      if (longitude[i] > 180)
+      {
+        this_longitude = longitude[i]-360.0;
+        next_longitude = longitude[i+1]-360.0;
+      }
+      else if (longitude[i] < -180)
+      {
+        this_longitude = 360.0+longitude[i];
+        next_longitude = 360.0+longitude[i+1];
+      }
+      else
+      {
+        this_longitude = longitude[i];
+        next_longitude = longitude[i+1];
+      }
+
+
+      string first_bit = "{ \"type\": \"Feature\", \"properties\": { \"latitude\": ";
+      //string second_bit = dtoa(latitude[i])+", \"longitude\": "+ dtoa(this_longitude);
+      string second_bit = ", \"longitude\": ";
+
+      string third_bit;
+      for( map<string, vector<string> >::iterator it = data_map.begin(); it != data_map.end(); ++it)
+      {
+        third_bit += ", \""+it->first+"\": "+(it->second)[i];
+      }
+      string fourth_bit = " }, \"geometry\": { \"type\": \"Linestring\", \"coordinates\": [ [";
+      //string fifth_bit = dtoa(this_longitude) +","+ dtoa(latitude[i]) +" ] } },";
+
+      string fifth_bit;
+      if (i == (n_nodes-2) )
+      {
+        fifth_bit = " ] ] } }";
+      }
+      else
+      {
+        fifth_bit = " ] ] } },";
+      }
+
+      outfile << first_bit << latitude[i] << second_bit << this_longitude
+              << third_bit+fourth_bit << this_longitude << "," << latitude[i] << "], [" << next_longitude << "," << latitude[i+1] << fifth_bit
+              << endl;
+    }
+    outfile << "]" << endl;
+    outfile << "}" << endl;
+
+    outfile.close();
+  }
+  else
+  {
+    cout << "LSDSpatialCSVReader::print_data_to_geojson error." << endl;
+    cout << "This dataset does not have lat-long information so I cannot print a geojson" << endl;
+  }
+
+}
+
+//==============================================================================
+// This updates XY coordinates with the coordinates centred on a corresponding
+// raster pixel.
+//==============================================================================
+void LSDSpatialCSVReader::centre_XY_by_row_col(LSDRaster& ThisRaster, string X_column_name, string Y_column_name)
+{
+ // Get the local coordinate as well as the elevations (elevation not really necessary)
+  vector<float> UTME = data_column_to_float(X_column_name);
+  vector<float> UTMN = data_column_to_float(Y_column_name);
+  // vector<float> elev = channel_nodes.data_column_to_float(elevation_column_name);
+
+  // Initialise vectors and variables to store XY data from the raster
+  vector<string> new_X_vector;
+  vector<string> new_Y_vector;
+  float new_X;
+  float new_Y;
+
+  cout << "I am comparing your channel node coordinates with the centre coordinates of the corresponding raster pixel and collecting the raster coordinates." << endl;
+  int row,col;
+  for(int i = 0; i< int(UTME.size()); i++)
+  {
+    get_row_and_col_of_a_point(UTME[i],UTMN[i],row, col);
+    ThisRaster.get_x_and_y_locations(row, col, new_X, new_Y);
+
+    // Some shenanigans to convert the coordinates into a string, letting us add them to the vector and then the csv data map
+    UTME[i] = new_X;
+    UTMN[i] = new_Y;
+
+    stringstream new_X_string;
+    stringstream new_Y_string;
+    new_X_string.precision(9);
+    new_Y_string.precision(9);
+    new_X_string << UTME[i];
+    new_Y_string << UTMN[i];
+    // Let's add the new X and Y strings to our vectors
+    new_X_vector.push_back(new_X_string.str());
+    new_Y_vector.push_back(new_Y_string.str());
+
+  }
+  cout << "New channel X coordinate vector stores " << int(new_X_vector.size()) << " X coordinates." << endl;
+
+  cout << "I will try to add the new coordinates to your data now. \nWARNING: This will fail if you do not have a latitude column in your data set!" << endl;
+  cout << "We must all bow to our lord and saviour lat-long. \nThis will also overwrite your old XY coordinates." << endl;
+  add_data_column(X_column_name, new_X_vector);
+  add_data_column(Y_column_name, new_Y_vector);
+
+  cout << "Updating lat-long from the new XY coordinates. This will overwrite any old lat-long coordinates." << endl;
+  get_latlong_from_x_and_y(X_column_name, Y_column_name);
+}
+
+//==============================================================================
+// This finds gaps in channel node data and fills the gap by interpolating
+// across the gap and adding an extra node with a new value for all columns of
+// the csv file. This is not a particularly elegant function but it does what it
+// it is supposed to do.
+// NOTE: This only adds one node per gap, so you would need multiple iterations
+// of this function if you need to add more then one node.
+//==============================================================================
+
+void LSDSpatialCSVReader::interpolate_across_gap(LSDRaster& ThisRaster, string X_column_name, string Y_column_name, string fd_column_name)
+{
+  cout << "Let's find some gaps!" << endl;
+  cout << "WARNING: This will only work if your data is SORTED BY FLOW DISTANCE. \nOtherwise your interpolated channel will be a pretzel." << endl;
+
+  vector<float> flow_distance = data_column_to_float(fd_column_name);
+  vector<float> UTME = data_column_to_float(X_column_name);
+  vector<float> UTMN = data_column_to_float(Y_column_name);
+
+  int row, col;
+  float nw_x, nw_y, n_x, n_y, ne_x, ne_y, e_x, e_y, w_x, w_y, sw_x, sw_y, s_x, s_y, se_x, se_y;
+
+  int gap_counter = 0;
+  vector<float> guilty_X_vector, guilty_Y_vector;
+  float next_x, next_y;
+
+  for(int i = 0; i< int(flow_distance.size()); i++)
+  {
+    // cout << "Flow distance is " << flow_distance[i] << endl;
+    if(i!=int(flow_distance.size()-1))
+    {
+      // cout << "Next flow distance is " << flow_distance[i+1] << endl;
+      next_x = UTME[i+1];
+      next_y = UTMN[i+1];
+      // cout << "Next coordinates are " << next_x << next_y << endl;
+      get_row_and_col_of_a_point(UTME[i],UTMN[i],row, col);
+      // cout << "Row is " << row << " and col is " << col << endl;
+      ThisRaster.get_x_and_y_locations(row+1, col-1, nw_x, nw_y);
+      ThisRaster.get_x_and_y_locations(row+1, col, n_x, n_y);
+      ThisRaster.get_x_and_y_locations(row+1, col+1, ne_x, ne_y);
+      ThisRaster.get_x_and_y_locations(row, col-1, w_x, w_y);
+      ThisRaster.get_x_and_y_locations(row, col+1, e_x, e_y);
+      ThisRaster.get_x_and_y_locations(row-1, col-1, sw_x, sw_y);
+      ThisRaster.get_x_and_y_locations(row-1, col, s_x, s_y);
+      ThisRaster.get_x_and_y_locations(row-1, col+1, se_x, se_y);
+
+      if((next_x == nw_x && next_y == nw_y)
+      || (next_x == n_x && next_y == n_y)
+      || (next_x == ne_x && next_y == ne_y)
+      || (next_x == e_x && next_y == e_y)
+      || (next_x == w_x && next_y == w_y)
+      || (next_x == sw_x && next_y == sw_y)
+      || (next_x == s_x && next_y == s_y)
+      || (next_x == se_x && next_y == se_y)
+      )
+      {
+        // cout << "We've got the next node, all good" << endl;
+      }
+      else
+      {
+        cout.precision(12);
+
+        cout << "There seems to be a gap." << endl;
+        gap_counter = gap_counter +1;
+
+        float diff_flowdist;
+        cout << "Flow distance is " << flow_distance[i] << endl;
+        cout << "Next flow distance is " << flow_distance[i+1] << endl;
+
+        diff_flowdist = flow_distance[i] - flow_distance[i+1];
+
+        cout << "Flow distance jump is: " << diff_flowdist << endl;
+
+        if(abs(diff_flowdist) > 200)
+        {
+          cout << "I think we are at the head of a channel, let's ignore this point." << endl;
+        }
+
+        else
+        {
+
+          // Store coordinates of node before gap
+          guilty_X_vector.push_back(UTME[i]);
+          guilty_Y_vector.push_back(UTMN[i]);
+
+          for (const auto& kv : get_data_map())
+          {
+            // cout << "I AM NAME OF COLUMN:" << kv.first << endl;
+            vector<string> this_string_vector = kv.second;
+
+            // Converting the vectors to float, adapted from https://stackoverflow.com/questions/35419046/converting-from-vectorstring-to-vectordouble-without-stdstod
+            vector<float> this_float_vector;
+            // iterate over vector and convert each object to float, then add to new float vector
+            for (vector<string>::const_iterator iter = this_string_vector.begin(); iter != this_string_vector.end(); ++iter)
+            {
+              string const& element = *iter;
+              // use a stringstream to get a float value:
+              // istringstream is(element);
+              // float result;
+              // is >> result;
+              std::ostringstream out;
+              out << std::setprecision(12) << std::stof(element);
+              float precise = std::stof(out.str());
+
+
+
+              // add the float value to the result vector:
+              this_float_vector.push_back(precise);
+            }
+            // cout << "Downstream of gap, " << kv.first << " is " << this_float_vector[i] << endl;
+            // cout << "Upstream of gap, " << kv.first << " is " << this_float_vector[i+1] << endl;
+            // cout << "Let's do a super basic interpolation!" << endl;
+
+            float interpolated_value;
+            interpolated_value = this_float_vector[i] + ((this_float_vector[i+1] - this_float_vector[i])/2);
+            // cout << "Interpolated value of " << kv.first << " is " << interpolated_value << endl;
+            stringstream interpolated_string;
+            interpolated_string.precision(12);
+            interpolated_string << interpolated_value;
+            append_to_col(kv.first, to_string(interpolated_value) ); // previous, outdated version: append_to_col(kv.first, interpolated_string.str());
+          }
+        }
+      }
+    }
+    else
+    {
+      cout << "That's the last node, I don't need to check for gaps." << endl;
+    }
+  }
+
+  // We should probably also centre all the coordinates again to make sure that the new ones are good
+  cout << "There were " << gap_counter << " gaps, captain. I have filled them." << endl;
+  // Let's check that each column is actually increasing in size
+        for (const auto& kv : get_data_map())
+        {
+          vector<string> new_string_vector = kv.second;
+          cout << "Column " << kv.first << " stores " << int(new_string_vector.size()) << " values." << endl;
+        }
+  // let's print the coordinates before each gap to csv to check them
+  print_UTM_coords_to_csv(guilty_X_vector, guilty_Y_vector, "bad_channel_points.csv");
+
+  cout << "Getting lat-long from the new XY coordinates. This will overwrite any old lat-long coordinates." << endl;
+  get_latlong_from_x_and_y(X_column_name, Y_column_name);
+
+}
+
+//==============================================================================
+// This returns the data map
+//==============================================================================
+map<string,vector<string> >& LSDSpatialCSVReader::get_data_map() {return this->data_map;}
+
+//==============================================================================
+// This appends a value to a column
+//==============================================================================
+void LSDSpatialCSVReader::append_to_col(string colname, string val){this->data_map[colname].push_back(val);}
+
+
+
+
 
 
 #endif

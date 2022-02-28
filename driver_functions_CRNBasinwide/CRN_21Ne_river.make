@@ -19,8 +19,9 @@ SOURCES=CRN_21Ne_river.cpp \
         ../LSDBasin.cpp \
         ../LSDParticle.cpp \
         ../LSDCRNParameters.cpp \
-        ../LSDSpatialCSVReader.cpp \
         ../LSDParameterParser.cpp \
+        ../LSDRasterMaker.cpp \
+        ../LSDSpatialCSVReader.cpp \
         ../LSDCosmoData.cpp \
         ../LSDRasterInfo.cpp
 OBJECTS=$(SOURCES:.cpp=.o)

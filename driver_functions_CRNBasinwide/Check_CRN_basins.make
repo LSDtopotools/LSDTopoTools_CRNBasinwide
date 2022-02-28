@@ -20,6 +20,8 @@ SOURCES=Check_CRN_basins.cpp \
         ../LSDParticle.cpp \
         ../LSDCRNParameters.cpp \
         ../LSDCosmoData.cpp \
+        ../LSDRasterMaker.cpp \
+        ../LSDSpatialCSVReader.cpp \
         ../LSDStrahlerLinks.cpp \
         ../LSDRasterInfo.cpp
 OBJECTS=$(SOURCES:.cpp=.o)

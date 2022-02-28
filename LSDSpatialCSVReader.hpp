@@ -207,6 +207,29 @@ class LSDSpatialCSVReader
                                     vector<string>& data_vector);
 
 
+    /// @brief Checks if a column is in the data map
+    /// @param column_name a string column name to check
+    /// @author SMM
+    /// @date 03/10/2019
+    bool is_column_in_csv(string column_name);
+
+    /// This looks for a string fragment in the column names so that 
+    ///  if you are a little off with the column name you can still try to find the correct one.
+    /// @param column_name_fragment A string fragment you will search for in the column names
+    /// @return the full name of the column that contains the fragment
+    /// @author SMM
+    /// @date 19/03/2021
+    string find_string_in_column_name(string column_name_fragment);
+
+    /// @brief Adds a data column to the map.
+    /// @detail Note this assumes you have the node ordering correct
+    /// @param column_name the column name, duh
+    /// @param column_data the data as a vector of strings. You need to convert
+    ///   other kinds of data to string if you want it in the data map
+    /// @return a boolean that is true if the column was added
+    /// @author SMM
+    /// @date 09/02/2021
+    bool add_data_column(string column_name, vector<string> column_data);
 
 
     /// @brief This gets a data column from the csv file
@@ -240,6 +263,48 @@ class LSDSpatialCSVReader
     /// @date 27/09/2018
     vector<double> data_column_to_double(string column_name);
 
+    /// @brief This takes the values in the data column and adds
+    ///  a float value. to them. It will not check if the column is actually floats
+    ///  so caution is needed!
+    /// @param column_name a string that holds the column name
+    /// @float add_value The value to be added. If you want to subtract use the negative value
+    /// @author SMM
+    /// @date 28/09/2020
+    void data_column_add_float(string column_name, float add_value);
+
+    /// @brief This takes the values in the data column and adds
+    ///  a float value. to them. It will not check if the column is actually floats
+    ///  so caution is needed!
+    /// @param column_name a string that holds the column name
+    /// @float add_value The value to be added. If you want to subtract use the negative value
+    /// @author SMM
+    /// @date 28/09/2020
+    void data_column_add_float(string column_name, vector<float> add_value);
+
+    /// @brief This takes the values in the data column and multiplies
+    ///  a float value. to them. It will not check if the column is actually floats
+    ///  so caution is needed!
+    /// @param column_name a string that holds the column name
+    /// @float mulitply_value The value to be multiplied. If you want to divide use the inverse value
+    /// @author SMM
+    /// @date 28/09/2020
+    void data_column_multiply_float(string column_name, float multiply_value);
+
+    /// @brief Replaces a data column with a new float vector
+    /// @param column_name a string that holds the column name
+    /// @float new_column The new float column
+    /// @author SMM
+    /// @date 21/04/2021
+    void data_column_replace(string column_name, vector<float> new_column);
+
+    /// @brief This is a very specific function used only to impose a minimum gradient on the single
+    ///   channel
+    /// @param fd_column_name a string that holds the flow distance column name
+    /// @param elevation_column_name a string that holds the elevation column name
+    /// @float minimum_slope The minimum slope along the single channel
+    /// @author SMM
+    /// @date 28/09/2020
+    void enforce_slope(string fd_column_name, string elevation_column_name, float minimum_slope);
 
     /// @brief this check to see if a point is within the raster
     /// @param X_coordinate the x location of the point
@@ -248,6 +313,12 @@ class LSDSpatialCSVReader
     /// @author SMM
     /// @date 13/11/2014
     void check_if_points_are_in_raster();
+
+    /// @brief Returns the points_in_raster_vector
+    /// @return is_in_raster a boolean telling if the point is in the raster
+    /// @author SMM
+    /// @date 14/02/2021
+    vector<bool> get_if_points_are_in_raster_vector();
 
     /// @brief This function gets vectors of x and y coordinates and node indices
     /// from these points
@@ -264,10 +335,34 @@ class LSDSpatialCSVReader
     void get_nodeindices_from_x_and_y_coords(LSDFlowInfo& FlowInfo, vector<float>& X_coords, vector<float>& Y_coords, vector<int>& NodeIndices);
 
     /// @brief Function to get vector of node indices from the csv file
-    /// @param: FlowInfo LSDFlowInfo object
-    /// @author: FJC
-    /// @date: 28/09/18
+    /// @param FlowInfo LSDFlowInfo object
+    /// @author FJC
+    /// @date 28/09/18
     vector<int> get_nodeindices_from_lat_long(LSDFlowInfo& FlowInfo);
+
+    /// @brief Function to extract the nodeindex
+    ///  The nodeindex needs to be in the object, will take "node", "id", and "nodeindex" as columns
+    /// @author SMM
+    /// @return A vector of the nodeindices
+    /// @date 08/10/2019
+    vector<int> get_nodeindex_vector();
+
+    /// @brief Uses the lat-long in the csv information to get the nodeindex for a given flowinfo object
+    ///  Creates a new "nodeindex" column in the object
+    /// @param FlowInfo a flowinfo object
+    /// @author SMM
+    /// @return none, but updates the data_map
+    /// @date 09/02/2021
+    void add_nodeindex_vector_to_data_map_using_lat_long(LSDFlowInfo& FlowInfo);
+
+
+    /// @brief Function to create a map with nodeindex as the key
+    ///  The nodeindex needs to be in the object
+    /// @param column name
+    /// @author SMM
+    /// @date 03/10/2019
+    map<int,float> get_nodeindex_map_float(string column_name);
+
 
     /// @brief This selects specified data and crease a new csv object with just that data
     /// @param selection_column The name of the column from which the data will be selected
@@ -281,6 +376,16 @@ class LSDSpatialCSVReader
     /// @author SMM
     /// @date 20/02/2017
     void print_data_map_keys_to_screen();
+
+    /// @brief Gets the row and col of a point in UTM
+    /// @param X_coordinate in UTM
+    /// @param Y_coordinate in UTM
+    /// @param row
+    /// @param col
+    /// @author SMM
+    /// @date 30/09/2020
+    void get_row_and_col_of_a_point(float X_coordinate,float Y_coordinate,int& row, int& col);
+    void get_row_and_col_of_a_point(double X_coordinate,double Y_coordinate,int& row, int& col);
 
     /// @brief this prints the latitude and longitude to screen
     /// @author SMM
@@ -300,6 +405,13 @@ class LSDSpatialCSVReader
     /// @date 03/03/17
     void print_UTM_coords_to_csv(vector<float> UTME, vector<float> UTMN, string csv_outname);
 
+    /// @brief print the rows and columns to a csv file for checking
+    /// @param csv_outname nAME OF THE OUTFILE
+    /// @param UTMN northings
+    /// @author SMM
+    /// @date 30/09/2020
+    void print_row_and_col_to_csv(string csv_outname);
+
     /// @brief print the data to a csv. Used after updating data
     /// @param csv_outname the name of the new file
     /// @author SMM
@@ -313,9 +425,40 @@ class LSDSpatialCSVReader
     /// @date 14/03/17
     void print_data_to_geojson(string json_outname);
 
+    void print_data_to_geojson_linestring(string json_outname);
+
+    /// @brief Centres XY coordinates on row col of a topography raster
+    /// @param ThisRaster the raster
+    /// @param X_column_name the name of the X coordinate column
+    /// @param Y_column_name the name of the Y coordinate column
+    /// @author ELSG
+    /// @date 04/03/21
+    void centre_XY_by_row_col(LSDRaster& ThisRaster, string X_column_name, string Y_column_name);
+
+    /// @brief Finds gaps in channel data and fills them with one extra node.
+    /// @param ThisRaster the raster
+    /// @param X_column_name the name of the X coordinate column
+    /// @param Y_column_name the name of the Y coordinate column
+    /// @param fd_column_name the name of the flow distance column
+    /// @author ELSG
+    /// @date 04/03/21
+    void interpolate_across_gap(LSDRaster& ThisRaster, string X_column_name, string Y_column_name, string fd_column_name);
+
+    // @brief Returns the data map
+    /// @author BG/ELSG
+    /// @date 01/03/21
+    map<string,vector<string> >& get_data_map();
+
+    // @brief Appends a value to a column
+    /// @author BG/ELSG
+    /// @date 02/03/21
+    void append_to_col(string colname, string val);
+
     /// Gets the various data members
     vector<double> get_latitude() const {return latitude;}
     vector<double> get_longitude() const {return longitude;}
+
+
 
 
   protected:

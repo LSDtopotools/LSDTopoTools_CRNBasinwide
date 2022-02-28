@@ -183,6 +183,12 @@ class LSDCosmoData
     /// @author SMM
     /// @date 03/03/2015
     void check_rasters();
+
+    /// @brief This sets the path to atmospheric data
+    /// @author SMM
+    /// @param the new path to atmostperic data
+    /// @date 22/04/2020
+    void set_path_to_atmospheric_data(string atmos_path);
     
     /// @detail This function takes a DEM and then spawns dems that are clipped
     ///  to the basin boundaries, with padding to incorporate surrounding high
@@ -211,6 +217,15 @@ class LSDCosmoData
     /// @author SMM
     /// @date 15/07/2015
     void RunShielding(string path, string prefix);
+
+    /// @brief This sets topographic shielding for basins listed in the 
+    ///   _CRNRasters.csv file to 1
+    /// @detail Shielding rasters (of 1) are printed to the same folder as the DEM
+    /// @param path This is a string containing the path to the data files (needs / at the end)
+    /// @param prefix the prefix of the data files
+    /// @author SMM
+    /// @date 22/04/2020
+    void RunShielding_Unshielded(string path, string prefix);
 
     /// @brief This function calculates and then returns a production raster
     /// @param Elevation_data a raster holding the elevations
@@ -476,6 +491,27 @@ class LSDCosmoData
                                       vector<double> toposhield,
                                       vector<double> production_scaling, 
                                       string muon_scaling);
+
+
+
+    /// @brief This function calculates the concentration of a CRN
+    ///  (either 10Be or 26Al) given an erosion rate supplied by and 
+    ///  erosion rate raster (in g/cm^2/yr)
+    /// @param Raster_names a vector of strings with 4 elements:
+    ///  [0] = DEM_filename
+    ///  [1] = Snow_shield_raster_name OR const_snow_shield in g/cm^2
+    ///  [2] = Self_shield_raster_name OR const_self_shield in g/cm^2
+    ///  [3] = Toposhield_raster_name 
+    ///  It there is no DEM then this is set to "NULL"
+    ///  @param CRN_params this contains the single shielding depths for snow
+    ///   and self shielding if the rasters are not supplied. 
+    /// @param known_eff_erosion an LSDRaster with known erosion rates in g/cm^2/yr
+    /// @author SMM
+    /// @date 14/06/2016
+    void full_shielding_CRN_concentration_predictor(vector<string> Raster_names,
+                            vector<double> CRN_params, 
+                            LSDRaster& known_eff_erosion);
+
 
 
     /// @brief this function prints the data held in the the data members

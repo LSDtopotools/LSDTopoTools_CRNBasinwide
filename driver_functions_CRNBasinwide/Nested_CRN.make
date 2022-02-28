@@ -20,6 +20,8 @@ SOURCES=Nested_cosmogenic_analysis.cpp \
         ../LSDParticle.cpp \
         ../LSDCRNParameters.cpp \
         ../LSDCosmoData.cpp \
+        ../LSDRasterMaker.cpp \
+        ../LSDSpatialCSVReader.cpp \
         ../LSDRasterInfo.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 EXECUTABLE=Nested_CRN.exe

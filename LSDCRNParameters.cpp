@@ -66,6 +66,7 @@ using namespace TNT;
 #ifndef LSDCRNParameters_CPP
 #define LSDCRNParameters_CPP
 
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // the LSDCRNParameters object
@@ -647,7 +648,7 @@ void LSDCRNParameters::P_mu_total(double z,double h)
                   - phi_vert_site*(-2*M_PI*(1/((nofz+1.0)*(nofz+1.0))))*dndz;
     
   // convert to negative muons/g/yr
-  double R = R_temp*0.44*60.0*60.0*24.0*365.0;
+  double this_R = R_temp*0.44*60.0*60.0*24.0*365.0;
 
   // Now calculate the production rates. 
   // Depth-dependent parts of the fast muon reaction cross-section
@@ -683,8 +684,8 @@ void LSDCRNParameters::P_mu_total(double z,double h)
   //cout << "Pfast26Al: " << P_fast_Al26 << " P2: " << P2_26Al << endl;
   
   // negative muon capture
-  double P_neg_Be10 = R*CRONUS_data_map["k_neg10"];
-  double P_neg_Al26 = R*CRONUS_data_map["k_neg26"];
+  double P_neg_Be10 = this_R*CRONUS_data_map["k_neg10"];
+  double P_neg_Al26 = this_R*CRONUS_data_map["k_neg26"];
 
   //cout << "Sig0: " << sigma0_Be10 << " Pfast: " << P_fast_Be10 << " P_neg: " << P_neg_Be10 << endl;
 
@@ -693,7 +694,7 @@ void LSDCRNParameters::P_mu_total(double z,double h)
   temp_data_map["phi_vert_site"] = phi_vert_site;
   temp_data_map["R_vert_site"] = R_vert_site;
   temp_data_map["phi"] = phi;
-  temp_data_map["R"] = R;
+  temp_data_map["R"] = this_R;
   temp_data_map["Beta"] = Beta;
   temp_data_map["Ebar"] = Ebar;
   temp_data_map["P_fast_10Be"] = P_fast_Be10;
@@ -1144,69 +1145,6 @@ void LSDCRNParameters::set_Braucher_parameters()
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-// 10Be is set to a new production curve provided by Shasta Marrero
-// All others: sets the parameters to those used by Braucher et al 2009
-// as implemented in cosmocalc v2.0
-// http://www.ucl.ac.uk/~ucfbpve/cosmocalc/updates.html
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-void LSDCRNParameters::set_newCRONUS_parameters()
-{
-  //S_t = 1;
-
-  // from Vermeesh 2007
-  // 10Be from Chmeleff/Korschinek 10Be decay constant;
-  lambda_10Be = 500e-9;    // in yr-1
-  lambda_26Al = 980e-9;    // in yr-1
-  lambda_14C = 121e-6;     // in yr-1
-  lambda_36Cl = 230e-8;    // in yr-1          
-
-  // from Data provided by Shasta mararreo for 10Be, everyting
-  // else is from the Braucher constants
-  //
-  // All but 10Be are calibrated to the Stone scaling
-  // Also linke to the nishizumii standards
-  // These come with Cosmocalc version 2.0
-  // http://www.ucl.ac.uk/~ucfbpve/cosmocalc/updates.html
-  P0_10Be = 4.075213;          // in a/g/yr
-  P0_26Al = 31.10;         // in a/g/yr
-  P0_14C = 15.21;          // in a/g/yr
-  P0_36Cl = 58.95;         // in a/g/yr
-  P0_21Ne = 18.23;         // in a/g/yr
-  P0_3He = 121.59;         // in a/g/yr
-
-  // in g/cm^2
-  Gamma[0] = 160;
-  Gamma[1] = 1459.76761923;
-  Gamma[2] = 11039.2402217;
-  Gamma[3] = 4320;
-
-  // dimensionless
-  F_10Be[0] = 0.98374;
-  F_10Be[1] = 0.0137188126531;
-  F_10Be[2] = 0.00252519164093;
-  F_10Be[3] = 0.0;
-
-  // dimensionless
-  F_26Al[0] = 0.9699;
-  F_26Al[1] = 0.0275;
-  F_26Al[2] = 0.000;
-  F_26Al[3] = 0.0026;
-
-  // dimensionless
-  F_14C[0] = 0.83;
-  F_14C[1] = 0.15;
-  F_14C[2] = 0.0;
-  F_14C[3] = 0.02;
-
-  // dimensionless
-  F_36Cl[0] = 0.9456;
-  F_36Cl[1] = 0.0324;
-  F_36Cl[2] = 0.00;
-  F_36Cl[3] = 0.022;
-}
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // 10Be production is based on a combination of data from Braucher et al 2011
 // and Borchers et al 2016 as transcribed by Mirjam Schaller
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -1264,6 +1202,77 @@ void LSDCRNParameters::set_BraucherBorchers_parameters()
   F_36Cl[3] = 0.022;
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
+
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// 10Be is set to a new production curve provided by Shasta Marrero
+// All others: sets the parameters to those used by Braucher et al 2009
+// as implemented in cosmocalc v2.0
+// http://www.ucl.ac.uk/~ucfbpve/cosmocalc/updates.html
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+void LSDCRNParameters::set_newCRONUS_parameters()
+{
+  //S_t = 1;
+
+  // from Vermeesh 2007
+  // 10Be from Chmeleff/Korschinek 10Be decay constant;
+  lambda_10Be = 500e-9;    // in yr-1
+  lambda_26Al = 980e-9;    // in yr-1
+  lambda_14C = 121e-6;     // in yr-1
+  lambda_36Cl = 230e-8;    // in yr-1          
+
+  // from Data provided by Shasta mararreo for 10Be, everyting
+  // else is from the Braucher constants
+  //
+  // All but 10Be are calibrated to the Stone scaling
+  // Also linke to the nishizumii standards
+  // These come with Cosmocalc version 2.0
+  // http://www.ucl.ac.uk/~ucfbpve/cosmocalc/updates.html
+  
+  // UPDATE The Al, Ne, He and 14C data come from the newcronus production files:
+  // https://bitbucket.org/cronusearth/cronus-calc/src/bfdbded294a6432b9f4262a3859aee9fb9df9b18/de/production/physpars.m?at=master&fileviewer=file-view-default
+  P0_10Be = 4.075213;          // in a/g/yr
+  P0_26Al = 27.9;         // in a/g/yr
+  P0_14C = 12.2;          // in a/g/yr
+  P0_36Cl = 58.95;         // in a/g/yr
+  P0_21Ne = 16.63;         // in a/g/yr
+  P0_3He = 118.0;         // in a/g/yr
+
+  // in g/cm^2
+  Gamma[0] = 160;
+  Gamma[1] = 1459.76761923;
+  Gamma[2] = 11039.2402217;
+  Gamma[3] = 4320;
+
+  // ONLY 10Be reflects new CRONUS!!!!!!!
+  // dimensionless
+  F_10Be[0] = 0.98374;
+  F_10Be[1] = 0.0137188126531;
+  F_10Be[2] = 0.00252519164093;
+  F_10Be[3] = 0.0;
+
+  // dimensionless
+  F_26Al[0] = 0.9699;
+  F_26Al[1] = 0.0275;
+  F_26Al[2] = 0.000;
+  F_26Al[3] = 0.0026;
+
+  // dimensionless
+  F_14C[0] = 0.83;
+  F_14C[1] = 0.15;
+  F_14C[2] = 0.0;
+  F_14C[3] = 0.02;
+
+  // dimensionless
+  F_36Cl[0] = 0.9456;
+  F_36Cl[1] = 0.0324;
+  F_36Cl[2] = 0.00;
+  F_36Cl[3] = 0.022;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+
 
 
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-

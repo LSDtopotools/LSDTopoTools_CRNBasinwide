@@ -303,7 +303,7 @@ void LSDRasterInfo::read_header(string filename, string extension)
       {
         // the the rest of the lines
         int NChars = 5000; // need a big buffer beacause of the projection string
-        char thisline[NChars];  
+        char* thisline = new char[NChars]; //char thisline[NChars]; MSVC/Clang uniformisation
         vector<string> lines;
         while( ifs.getline(thisline, NChars) )
         {
@@ -600,7 +600,43 @@ void LSDRasterInfo::get_UTM_information(int& UTM_zone, bool& is_North)
 }
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+//
+// Checks to see is a point is in the raster
+//
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+bool LSDRasterInfo::check_if_point_is_in_raster(float X_coordinate,float Y_coordinate)
+{
+  bool is_in_raster = true;
+
+  // Shift origin to that of dataset
+  float X_coordinate_shifted_origin = X_coordinate - XMinimum;
+  float Y_coordinate_shifted_origin = Y_coordinate - YMinimum;
+
+  // Get row and column of point
+  int col_point = int(X_coordinate_shifted_origin/DataResolution);
+  int row_point = (NRows - 1) - int(round(Y_coordinate_shifted_origin/DataResolution));
+
+  if(col_point < 0 || col_point > NCols-1 || row_point < 0 || row_point > NRows -1)
+  {
+    is_in_raster = false;
+  }
+
+  return is_in_raster;
+}
+//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 
+void LSDRasterInfo::print_raster_information()
+{
+  cout << "NRows: " << NRows << endl;
+  cout << "NCols: "  << NCols << endl;
+  cout << "XMinimum: "  << XMinimum << endl;
+  cout << "YMinimum: "  << YMinimum << endl;
+  cout << "DataResolution: " << DataResolution << endl;
+  cout << "NoDataValue: " << NoDataValue << endl;
+  cout << "ENVI_map_info: " << GeoReferencingStrings["ENVI_map_info"] << endl;
+  cout << "ENVI_coordinate_system: " << GeoReferencingStrings["ENVI_coordinate_system"] << endl;
+}
 
 #endif

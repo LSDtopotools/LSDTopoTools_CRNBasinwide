@@ -57,6 +57,13 @@ using namespace std;
 #ifndef LSDParticle_CPP
 #define LSDParticle_CPP
 
+// Sorting compiling problems with MSVC
+#ifdef _WIN32
+#ifndef M_PI
+extern double M_PI;
+#endif
+#endif
+
 
 const double one_min_exp_neg_2 = 1-exp(-2);
 const double one_min_exp_neg_5 = 1-exp(-5);
@@ -761,12 +768,14 @@ void LSDCRNParticle::update_10Be_SSfull_depth_integrated(double erosion_rate,
     top_eff_depth = temp_eff_depth;
   }
 
+  // If the top effective depth and the bottom effective depth are the same, then run the standard
+  // concentration for particles eroding from the top of this pixel
   if (top_eff_depth == bottom_eff_depth)
   {
     effective_dLoc = top_eff_depth;
     update_10Be_SSfull(erosion_rate, CRNp);
   }
-  else
+  else  // If they arent the same, this calculates the depth average concentrations of particles between the top and bottom effective depths.  
   {
     double this_term;
     double sum_term1 = 0;
@@ -855,10 +864,14 @@ vector<double> LSDCRNParticle::apparent_erosion_10Be_COSMOCALC(double rho, LSDCR
   {
     CRNp.set_newCRONUS_parameters();
   }
+  else if (Muon_scaling == "BraucherBorchers" )
+  {
+    CRNp.set_BraucherBorchers_parameters();
+  }
   else
   {
     cout << "You didn't set the muon scaling." << endl
-         << "Options are Schaller, Braucher, newCRONUS, and Granger." << endl
+         << "Options are Schaller, Braucher, newCRONUS, BraucherBorchers, and Granger." << endl
          << "You chose: " << Muon_scaling << endl
          << "Defaulting to Braucher et al (2009) scaling" << endl;
     CRNp.set_Braucher_parameters();     
@@ -947,7 +960,7 @@ double LSDCRNParticle::apparent_erosion_10Be_neutron_only(double rho, LSDCRNPara
   double exp_term = exp(-effective_dLoc/Gamma_neutron);
 
   //cout << "LSDCRNParticle line 741, S_t: " << CRNp.neutron_S_t << " P0: " << CRNp.P0_10Be 
-  //     << " total spallation: " << CRNp.S_t*CRNp.P0_10Be << endl 
+  //     << " total spallation: " << CRNp.neutron_S_t*CRNp.P0_10Be << endl 
   //     << " and the F_0: " << CRNp.F_10Be[0] << endl;
 
   app_eff_eros = Gamma_neutron*(exp_term*CRNp.neutron_S_t*CRNp.P0_10Be
@@ -1049,10 +1062,14 @@ vector<double> LSDCRNParticle::apparent_erosion_26Al_COSMOCALC(double rho, LSDCR
   {
     CRNp.set_newCRONUS_parameters();
   }
+  else if (Muon_scaling == "BraucherBorchers" )
+  {
+    CRNp.set_BraucherBorchers_parameters();
+  }
   else
   {
     cout << "You didn't set the muon scaling." << endl
-         << "Options are Schaller, Braucher, newCRONUS, and Granger." << endl
+         << "Options are Schaller, Braucher, newCRONUS, BraucherBorchers, and Granger." << endl
          << "You chose: " << Muon_scaling << endl
          << "Defaulting to Braucher et al (2009) scaling" << endl;
     CRNp.set_Braucher_parameters();     
@@ -1372,9 +1389,15 @@ void LSDCRNParticle::update_36Cl_SSfull(double erosion_rate, LSDCRNParameters& C
 void LSDCRNParticle::update_21Ne_conc(double dt,double erosion_rate, LSDCRNParameters& CRNp)
 {
   double Gamma_neutron= CRNp.Gamma[0];					// in g/cm^2
-
-  Conc_21Ne = Conc_21Ne +  CRNp.S_t*exp(-effective_dLoc/Gamma_neutron)*Gamma_neutron*CRNp.P0_21Ne*
+  if (erosion_rate == 0)
+  {
+    Conc_21Ne = Conc_21Ne +  CRNp.S_t*exp(-effective_dLoc/Gamma_neutron)*CRNp.P0_21Ne*dt;
+  }
+  else
+  {
+    Conc_21Ne = Conc_21Ne +  CRNp.S_t*exp(-effective_dLoc/Gamma_neutron)*Gamma_neutron*CRNp.P0_21Ne*
                (exp(dt*erosion_rate/Gamma_neutron) - 1)/erosion_rate;
+  }
 }
 
 

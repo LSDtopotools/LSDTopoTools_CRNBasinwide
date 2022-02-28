@@ -19,7 +19,10 @@ SOURCES=Cosmo_snapping.cpp \
         ../LSDBasin.cpp \
         ../LSDParticle.cpp \
         ../LSDCRNParameters.cpp  \
-        ../LSDCosmoData.cpp
+        ../LSDRasterMaker.cpp \
+        ../LSDSpatialCSVReader.cpp \
+        ../LSDCosmoData.cpp \
+        ../LSDRasterInfo.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 EXECUTABLE=cosmo_snapping.exe
 

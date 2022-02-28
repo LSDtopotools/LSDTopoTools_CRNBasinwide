@@ -97,6 +97,19 @@ class LSDRasterInfo
     /// @date 22/12/2014
     void get_UTM_information(int& UTM_zone, bool& is_North);
 
+    /// @brief this check to see if a point is within the raster
+    /// @param X_coordinate the x location of the point
+    /// @param Y_coordinate the y location of the point
+    /// @return is_in_raster a boolean telling if the point is in the raster
+    /// @author SMM
+    /// @date 13/11/2014
+    bool check_if_point_is_in_raster(float X_coordinate,float Y_coordinate);
+
+    /// @brief Prints the raster information to screen
+    /// @author SMM
+    /// @date 19/11/2019
+    void print_raster_information();
+
     // Get functions
     /// @return Number of rows as an integer.
     int get_NRows() const        { return NRows; }
@@ -130,6 +143,8 @@ class LSDRasterInfo
     /// @author SMM
     /// @date 01/01/12
     void read_header(string filename, string extension);
+
+
 
     ///Number of rows.
     int NRows;

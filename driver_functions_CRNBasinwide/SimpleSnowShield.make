@@ -15,6 +15,8 @@ SOURCES=SimpleSnowShield.cpp \
         ../LSDIndexChannelTree.cpp \
         ../LSDStatsTools.cpp \
         ../LSDMostLikelyPartitionsFinder.cpp \
+        ../LSDRasterMaker.cpp \
+        ../LSDSpatialCSVReader.cpp \
         ../LSDSoilHydroRaster.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 EXECUTABLE=SimpleSnowShield.exe

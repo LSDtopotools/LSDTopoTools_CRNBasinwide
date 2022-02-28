@@ -110,6 +110,13 @@ Tools are included to:
 #include "LSDShapeTools.hpp"
 using namespace std;
 using namespace TNT;
+// Sorting compiling problems with MSVC
+#ifdef _WIN32
+#ifndef M_PI
+extern double M_PI;
+#endif
+#endif
+
 
 ///@brief Main analysis object to interface with other LSD objects.
 class LSDRaster
@@ -145,6 +152,21 @@ class LSDRaster
             float cellsize, float ndv, Array2D<float> data)
       { create(nrows, ncols, xmin, ymin, cellsize, ndv, data); }
 
+  /// @brief Create an LSDRaster from memory.
+  /// @return LSDRaster
+  /// @param nrows An integer of the number of rows.
+  /// @param ncols An integer of the number of columns.
+  /// @param xmin A float of the minimum X coordinate.
+  /// @param ymin A float of the minimum Y coordinate.
+  /// @param cellsize A float of the cellsize.
+  /// @param ndv An integer of the no data value.
+  /// @param data An Array2D of floats in the shape nrows*ncols,
+  ///containing the data to be written.
+  /// @param copy_data: if true, data is copied, if false, data is referenced.
+  LSDRaster(int nrows, int ncols, float xmin, float ymin,
+            float cellsize, float ndv, Array2D<float> data, bool copy_data)
+      { create(nrows, ncols, xmin, ymin, cellsize, ndv, data, copy_data); }
+
   /// @brief Create an LSDRaster from memory, with the elvation
   /// data stored as double precision floats.
   /// @return LSDRaster
@@ -170,9 +192,14 @@ class LSDRaster
       float cellsize, float ndv, Array2D<float> data, map<string,string> temp_GRS)
   { create(nrows, ncols, xmin, ymin, cellsize, ndv, data, temp_GRS); }
 
+  /// @brief Create an LSDRaster from an LSDIndexRaster object
+  /// @return LSDRaster
+  /// @param IntLSDRaster an LSDIndexRaster object
+  /// @author SMM
+  /// @date 30/07/19
+  LSDRaster(LSDIndexRaster& IntLSDRaster)   { create(IntLSDRaster); }
 
   // Get functions
-
   /// @return Number of rows as an integer.
   int get_NRows() const        { return NRows; }
   /// @return Number of columns as an integer.
@@ -187,6 +214,9 @@ class LSDRaster
   int get_NoDataValue() const      { return NoDataValue; }
   /// @return Raster values as a 2D Array.
   Array2D<float> get_RasterData() const { return RasterData.copy(); }
+
+  Array2D<float>* get_RasterDataPtr() { return &RasterData; }
+
 
   /// @brief Get the raw raster data, double format
   /// @author DAV
@@ -214,6 +244,13 @@ class LSDRaster
   /// @author SMM
   /// @date 19/05/16
   void set_data_element(int row, int column, float value)  { RasterData[row][column] = value; }
+
+  /// @brief Sets the raster global data.
+  /// @param 2Darray new array of data. Needs to be same dimensions than the other one.
+  /// @author BG
+  /// @date 16/04/19
+  void set_data_array(Array2D<float> ndata)  { RasterData = ndata.copy(); }
+
 
   /// Assignment operator.
   LSDRaster& operator=(const LSDRaster& LSDR);
@@ -413,6 +450,39 @@ class LSDRaster
   void get_lat_and_long_locations(int row, int col, double& lat,
                   double& longitude, LSDCoordinateConverterLLandUTM Converter);
 
+  /// @brief This returns vectors of all the easting and northing points in the raster
+  ///  Used for interpolations
+  /// @param Eastings a vector of easting coordinates. Will be replaced by method.
+  /// @param Northings a vector of northing coordinates. Will be replaced by method.
+  /// @author SMM
+  /// @date 17/03/2017
+  void get_easting_and_northing_vectors(vector<float>& Eastings, vector<float>& Northings);
+
+  /// @brief This interpolates a vector of points onto the raster. Uses bilinear interpolation.
+  /// @param UTMEvec Easting coordinates of points to be interpolatiod.
+  /// @param UTMNvec Northing coordinates of points to be interpolatiod.
+  /// @return The vector of interpolated data.
+  /// @author SMM
+  /// @date 17/03/2017
+  vector<float> interpolate_points_bilinear(vector<float> UTMEvec, vector<float> UTMNvec);
+
+  /// @brief This fills a raster with precalculated interpolated data
+  /// @param rows_of_nodes the rows of the interpolated points
+  /// @param cols_of_nodes the colss of the interpolated points
+  /// @param interpolated data the actual data that has been interpolated
+  /// @author SMM
+  /// @date 17/02/2017
+  LSDRaster fill_with_interpolated_data(vector<int> rows_of_nodes, vector<int> cols_of_nodes,
+                                        vector<float> interpolated_data);
+
+  /// @brief This gets the value at a point in UTM coordinates
+  /// @param UTME the easting coordinate
+  /// @param UTMN the northing coordinate
+  /// @return The value at that point
+  /// @author SMM
+  /// @date 14/03/2017
+  float get_value_of_point(float UTME, float UTMN);
+
   /// @brief this check to see if a point is within the raster
   /// @param X_coordinate the x location of the point
   /// @param Y_coordinate the y location of the point
@@ -429,6 +499,17 @@ class LSDRaster
   /// @author SMM
   /// @date 22/01/2016
   void get_row_and_col_of_a_point(float X_coordinate,float Y_coordinate,int& row, int& col);
+  void get_row_and_col_of_a_point(double X_coordinate,double Y_coordinate,int& row, int& col);
+
+  /// @brief This reads a csv with x,y,value and finds the pixels at those locations and replaces the value
+  /// @detail the csv has columns X,Y,new_value
+  /// @param replace_filename the name of the csv file (with full path and csv extension)
+  /// @author SMM
+  /// @date 06/10/2021
+  void replace_pixels(string replace_filename);
+
+  void snap_to_row_col_with_greatest_value_in_window(int input_row, int input_col, int&out_row, int& out_col, int n_pixels);
+
 
 
   /// @brief This function returns a vector with the X adn Y minimum and max
@@ -448,6 +529,12 @@ class LSDRaster
   ///@date 06/11/15
   vector<float> get_RasterData_vector();
 
+  ///@brief This function returns the raster data as a vector, ignoring NDVs
+  ///@return vector<float> with raster data
+  ///@author MDH
+  ///@date 06/02/17
+  vector<float> get_RasterData_vector_No_NDVs();
+
 	///@brief This function returns the raster data as text file
   ///@return text file with raster data
   ///@author FJC
@@ -460,6 +547,11 @@ class LSDRaster
   /// @author SMM
   /// @date 18/02/14
   void rewrite_with_random_values(float range);
+
+  /// @brief Create a raster in of the same number of rows and cols with nodata
+  /// @author FJC
+  /// @date 07/04/17
+  LSDRaster create_raster_nodata();
 
   /// @brief Calculate the minimum bounding rectangle for an LSDRaster Object and crop out
   /// all the surrounding NoDataValues to reduce the size and load times of output rasters.
@@ -497,6 +589,14 @@ class LSDRaster
   /// @date 5/11/14
   LSDRaster RasterTrimmerSpiral();
 
+  /// @brief This replaces the first and last row and column with nodata
+  ///  used in drainage extraction where removal of all pixels that are 
+  ///  influenced by the edge is important
+  /// @return void but updates the data in the raster object
+  /// @author SMM
+  /// @date 15/01/2022
+  void replace_edges_with_nodata();
+
   /// @brief This returns a clipped raster that has the same dimensions as the
   ///  smaller raster
   /// @param smaller_raster the raster to which the bigger raster should be
@@ -530,6 +630,77 @@ class LSDRaster
   /// @date 01/04/2016
   void strip_raster_padding();
 
+  /// @brief Buffers a raster using a circular kernel of a user-defined radius (m)
+  /// @param window_radius radius in metres
+  /// @author FJC
+  /// @date 10/02/17
+  LSDRaster BufferRasterData(float window_radius);
+
+  /// @brief This finds the nearest value of a pixel that has data to a pixel in this_row,this_col;
+  ///  it is used to find the nearest value and distance to nodata nodes. Used in routines for
+  ///  masking then filling channels
+  /// @param this_row the row to be investigated
+  /// @param this_col the col to be investigated
+  /// @param distance the distance to the nearest occupied pixel (returned by value)
+  /// @param value the value of the nearest occupied pixel (returned by value)
+  /// @author SMM
+  /// @date 26/01/2021
+  void find_nearest_data(int this_row,int this_col, float& distance, float& value);
+
+
+  /// @brief This takes a list of points. Then, for every pixel in the
+  ///  raster it finds the point amongst that list that is closest to the given pixel.
+  /// @param Eastings a vector of easting locations
+  /// @param Northings a vector of northing locations
+  /// @param values The value of the list of points to map onto the raster.
+  ///  This functions is most commonly used for swath mapping so the value is usually a distance
+  /// @param swath_width the width of the swath in metres
+  /// @return A vector or rasters. The first is the closest distance to each pixel in the list
+  ///  the second is the value of the pixel in the list, and the third is the index in the list
+  ///  of the closest pixel
+  /// @author SMM
+  /// @date 15/02/2021
+  vector< LSDRaster > find_nearest_point_from_list_of_points(vector<float> Eastings, vector<float> Northings,
+                                              vector<float> values, float swath_width);
+
+  /// @brief This takes a list of points and makes a swath profile around them.
+  /// @param Eastings a vector of easting locations
+  /// @param Northings a vector of northing locations
+  /// @param values The value of the list of points to map onto the raster.
+  ///  This functions is most commonly used for swath mapping so the value is usually a distance
+  /// @param swath_width the width of the swath in metres
+  /// @param bin_width the distance between bins in the (i.e., the distance between points)
+  /// @param swath_data_prefix the prefix for the swath filenames
+  /// @param print_swath_rasters A boolean that controls if the swath rasters are printed
+  /// @return A vector or rasters. The first is the closest distance to each pixel in the list
+  ///  the second is the value of the pixel in the list, and the third is the index in the list
+  ///  of the closest pixel
+  /// @author SMM
+  /// @date 15/02/2021
+  void make_swath(vector<float> Eastings, vector<float> Northings,
+                                              vector<float> values, float swath_width, float bin_width,
+                                              string swath_data_prefix, bool print_swath_rasters);
+
+  /// @brief Finds all nodata nodes and gets rasters of the nearest points value and
+  ///  its distance
+  /// @return a vector of two rasters, the first is the distance and the second is the value
+  /// @author SMM
+  /// @date 26/01/2021
+  vector<LSDRaster> get_nearest_distance_and_value_masks();
+
+  /// @brief Finds all nodata nodes and gets rasters of the nearest points value and
+  ///  its distance
+  /// @param NoDataIgnore_raster a raster where the NaData values in that raster
+  ///  are ignored by the nearest to value data raster
+  /// @return a vector of two rasters, the first is the distance and the second is the value
+  /// @author SMM
+  /// @date 05/03/2021
+  vector<LSDRaster> get_nearest_distance_and_value_masks(LSDRaster& NoDataIgnore_raster);
+
+  /// @brief Pad one smaller raster to the same extent as a bigger raster by adding
+  /// no data around the edges
+  LSDIndexRaster PadSmallerRaster(LSDIndexRaster& smaller_raster);
+
   //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
   //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
   //
@@ -558,6 +729,22 @@ class LSDRaster
   /// @author JAJ (entered into trunk SMM)
   /// @date 01/02/2014
   float max_elevation(void);
+
+
+  /// @brief Calculates minimum elevation of a raster
+  /// @return Minimum elevation
+  /// @author SMM
+  /// @date 08/10/2021
+  float min_elevation();
+
+
+  /// @brief Calculates max elevation of a raster
+  /// @param row overwritten row of the maximum elevation
+  /// @param col overwritten col of the maximum elevation
+  /// @return The spatially distributed relief
+  /// @author SMM
+  /// @date 12/03/2021
+  float max_elevation(int& row, int& col);
 
   /// @brief Calculates mean relief of a raster, it defaults to a circular kernal
   /// @return The spatially distributed relief
@@ -612,6 +799,12 @@ class LSDRaster
   LSDRaster MapAlgebra_subtract(LSDRaster& M_raster);
 
 
+  /// @brief This changes the elevation of a raster
+  /// @param elevation_adjust The change in elevation
+  /// @author SMM
+  /// @date 30/01/2020
+  void AdjustElevation(float elevation_change);
+
   // Functions for the Diamond Square algorithm
 
   /// @brief This returns a value from the array data element but wraps around
@@ -642,6 +835,9 @@ class LSDRaster
   /// @author SMM
   /// @date 16/02/2014
   void DSSetFeatureCorners(int featuresize, float scale);
+
+
+
 
   /// @brief This is the square sampling step of the diamond square algorithm: it takes
   /// the average of the four corners and adds a random number to set the centrepoint
@@ -681,7 +877,9 @@ class LSDRaster
   /// in each direction to have rows and columns that are the nearest powers
   /// of 2. The xllocation and yllocation data values are preserved. The function
   /// returns a pseudo fractal landscape generated with the diamond square algorithm
-  ///
+  /// Believe it or not this algorithm is absed on code poseted by Notch, the creator of Minecraft,
+  /// who then had it modified by Charles Randall
+  /// https://www.bluh.org/code-the-diamond-square-algorithm/
   /// @param feature order is an interger n where the feature size consists of 2^n nodes.
   /// If the feature order is set bigger than the dimensions of the parent raster then
   /// this will default to the order of the parent raster.
@@ -690,6 +888,7 @@ class LSDRaster
   /// @author SMM
   /// @date 16/02/2014
   LSDRaster DiamondSquare(int feature_order, float scale);
+
 
   // Functions relating to shading, shadowing and shielding
 
@@ -808,6 +1007,39 @@ class LSDRaster
   /// @author DTM
   /// @date 28/03/2014
   vector<LSDRaster> calculate_polyfit_surface_metrics(float window_radius, vector<int> raster_selection);
+
+  /// @brief Surface polynomial fitting and extraction of topographic metrics.
+  ///  Same as above function but in this case one can opt for directional gradients.
+  ///  Added as another function to ensure legacy code is not broken.
+  /// @detail A six term polynomial surface is fitted to all the points that lie
+  /// within circular neighbourhood that is defined by the designated window
+  /// radius.  The user also inputs a binary raster, which tells the program
+  /// which rasters it wants to create (label as "1" to produce them, "0" to
+  /// ignore them. This has 8 elements, as listed below:
+  ///        0 -> Elevation (smoothed by surface fitting)
+  ///        1 -> Slope
+  ///        2 -> Aspect
+  ///        3 -> Curvature
+  ///        4 -> Planform Curvature
+  ///        5 -> Profile Curvature
+  ///        6 -> Tangential Curvature
+  ///        7 -> Stationary point classification (1=peak, 2=depression, 3=saddle)
+  ///        8 -> Directional gradients (dz/dx and dz,dy)
+  /// The program returns a vector of LSDRasters.  For options marked "false" in
+  /// boolean input raster, the returned LSDRaster houses a blank raster, as this
+  /// metric has not been calculated.  The desired LSDRaster can be retrieved from
+  /// the output vector by using the cell reference shown in the list above i.e. it
+  /// is the same as the reference in the input boolean vector.
+  /// @param window_radius -> the radius of the circular window over which to
+  /// fit the surface
+  /// @param raster_selection -> a binary raster, with 8 elements, which
+  /// identifies which metrics you want to calculate.
+  /// @return A vector of LSDRaster objects.  Those that you have not asked to
+  /// be calculated are returned as a 1x1 Raster housing a NoDataValue
+  ///
+  /// @author SMM
+  /// @date 22/06/2018
+  vector<LSDRaster> calculate_polyfit_surface_metrics_directional_gradients(float window_radius, vector<int> raster_selection);
 
   /// @brief Surface polynomial fitting and extraction of roughness metrics
   ///
@@ -1001,6 +1233,13 @@ class LSDRaster
   /// @author FJC
   /// @date 24/03/14
   LSDRaster remove_positive_hilltop_curvature(LSDRaster& hilltop_curvature);
+
+  /// @brief Removes positive values from a raster
+  /// @details Modifies araster to remove pixels with
+  /// positive values
+  /// @author MDH
+  /// @date 25/07/17
+  void remove_positive_values();
 
   /// @brief Gets the percentage of bedrock ridges
   /// @details Uses the hilltop curvature raster and the roughness raster. If the
@@ -1226,6 +1465,18 @@ class LSDRaster
   /// @date 28/9/2016
   LSDRaster mask_to_nodata_using_threshold(float threshold,bool belowthresholdisnodata);
 
+
+  /// @brief This function changes any data point either above or below threshold to NoDataValue
+  ///  The threshold is determined by a second raster
+  /// @param threshold The threshold value
+  /// @param belowthresholdisnodata a boolean that if true means anything below the
+  ///   threshold turns to nodata
+  /// @param MaskingRaster an LSDRaster that is used to define the mask
+  /// @return Returns the masked raster
+  /// @author SMM
+  /// @date 28/9/2016
+  LSDRaster mask_to_nodata_using_threshold_using_other_raster(float threshold,bool belowthresholdisnodata, LSDRaster& MaskingRaster);
+
   /// @brief This function creats an LSDIndexRaster mask (with true == 1 and otherwise nodata)
   /// from an LSDRaster. Can mask either above or below a threshold
   /// @param threshold The threshold value
@@ -1244,6 +1495,11 @@ class LSDRaster
   /// @author SMM
   /// @date 4/11/2014
   LSDRaster mask_to_nodata_with_mask_raster(LSDIndexRaster& Mask_raster, int mask_value);
+
+  /// @brief This function masks a raster to only include points with data in the second raster
+  /// @author FJC
+  /// @date 09/03/21
+  LSDRaster isolate_to_smaller_raster(LSDRaster& Mask_raster);
 
   ///@brief This function fills pits/sinks in a DEM by incrementing elevations for cells with
   ///no downslope neighbour. The process is repeated adnausium until no cells require
@@ -1787,6 +2043,14 @@ class LSDRaster
   /// @date 16/10/13
   LSDRaster D_inf_units();
 
+  //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  ///@brief Wrapper Function to create a D-infinity flow accumulation and drainage area raster
+  ///@return vector of LSDRaster (0 is acc, 1 is DA)
+  ///@author BG
+  ///@date 09/01/2018
+  //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  vector<LSDRaster> D_inf_flowacc_DA();
+
   ///@brief Wrapper Function to convert a D-infinity flow raster into spatial units.
   /// @return LSDRaster of D-inf flow areas in spatial units.
   /// @author MDH (after SWDG)
@@ -1889,7 +2153,7 @@ class LSDRaster
   vector<LSDRaster> neighbourhood_statistics_spatial_average_and_SD(float window_radius,
                                                     int neighbourhood_switch);
 
-  /// @brief gets relief within value specified circular neighbourhood
+  /// @brief gets relief within value specified neighbourhood
   ///
   /// @details The second argument (neighbourhood_switch) specifies the neighbourhood type:
   ///   0 Square neighbourhood
@@ -1901,6 +2165,32 @@ class LSDRaster
   /// @date 16/11/2014
   LSDRaster neighbourhood_statistics_local_relief(float window_radius,
                                                     int neighbourhood_switch);
+
+  /// @brief gets minimum or maximum value in a neighbourhood
+  ///
+  /// @details The second argument (neighbourhood_switch) specifies the neighbourhood type:
+  ///   0 Square neighbourhood
+  ///   1 Circular window
+  /// @param float window_radius -> radius of neighbourhood
+  /// @param int neighbourhood_switch -> see above
+  /// @param bool find_maximum -> if true, find the maximum, if false, find the minimum
+  /// @return LSDRaster contianing the maximum or minimum within a neighbourhood
+  /// @author SMM
+  /// @date 27/01/2021
+  LSDRaster neighbourhood_statistics_local_min_max(float window_radius, int neighbourhood_switch, bool find_maximum);
+
+  /// @brief Function to return an array with the location of the pixel with the minimum or
+  /// maximum value in a neighbourhood
+  /// @details The second argument (neighbourhood_switch) specifies the neighbourhood type:
+  ///   0 Square neighbourhood
+  ///   1 Circular window
+  /// @param float window_radius -> radius of neighbourhood
+  /// @param int neighbourhood_switch -> see above
+  /// @param bool find_maximum -> if true, find the maximum, if false, find the minimum
+  /// @return LSDRaster contianing the location and value of the maximum or minimum within a neighbourhood
+  /// @author FJC
+  /// @date 30/01/21
+  LSDRaster neighbourhood_statistics_local_min_max_location(Array2D<float>& TargetRasterData, float window_radius, int neighbourhood_switch, bool find_maximum);
 
   /// @brief tests neighbourhood for the fraction of values for which the specified
   /// condition is met.
@@ -1969,6 +2259,12 @@ class LSDRaster
   /// @date 09/12/2014
   LSDRaster alternating_direction_nodata_fill(int window_width);
 
+  /// @brief This returns an index raster with 1 for data and 0 for nodata
+  /// @return index raster 1 == data, 0 == nodata
+  /// @author SMM
+  /// @date 17/03/2017
+  LSDIndexRaster create_binary_isdata_raster();
+
   /// @brief A routine that fills nodata holes. It first prepares the data
   ///  with the sprial trimmer so nodata around the edges is removed.
   /// @detail The routine sweeps the raster looking for nodata and filling
@@ -1982,12 +2278,12 @@ class LSDRaster
   /// @author SMM
   /// @date 09/12/2014
   LSDRaster alternating_direction_nodata_fill_with_trimmer(int window_width);
-	
-	/// @brief Function to fill in no data holes in an irregular raster. Pixel must have 
-	/// all neighbours not equal to no data value within the specified window radius.  Data is 
+
+	/// @brief Function to fill in no data holes in an irregular raster. Pixel must have
+	/// all neighbours not equal to no data value within the specified window radius.  Data is
 	/// filled based on mean of pixels within the window radius.
 	LSDRaster nodata_fill_irregular_raster(int window_radius);
-	
+
 	/// @brief A routine that fills nodata holes. Modified by FJC to only fill holes
 	/// surrounded in all directions by pixels with valid elevation values
   /// @detail The routine sweeps the raster looking for nodata and filling
@@ -2013,6 +2309,12 @@ class LSDRaster
   /// @author MDH
   /// @date 27/08/2014
   LSDRaster ExtractByMask(LSDIndexRaster Mask);
+
+  /// @brief Function to update an LSDRaster based on a LSDIndexRaster mask
+  /// @param LSDIndexRaster TheMask
+  /// @author MDH
+  /// @date 26/07/2017
+  void MaskRaster(LSDIndexRaster Mask);
 
   /// @brief method to locate channel pixels outlined by Lashermes.
   ///
@@ -2124,6 +2426,14 @@ class LSDRaster
   /// @date 30/09/16
 	LSDRaster MergeRasters(LSDRaster& RasterToAdd);
 
+  /// @brief Method to merge data from two LSDRasters WITH SAME EXTENT together.  /// The data from the raster specified as an argument will be added (will
+  /// overwrite the original raster if there is a conflict). Overloaded function to rewrite original raster
+  /// rather than creating a new one
+  /// @param RasterToAdd second raster to add to original raster
+  /// @author FJC
+  /// @date 07/04/17
+  void OverwriteRaster(LSDRaster& RasterToAdd);
+
   /// @brief Function to get potential floodplain patches using a slope and relief threshold
   /// @param Relief raster with relief values
   /// @param Slope raster with slope values
@@ -2151,12 +2461,6 @@ class LSDRaster
   /// @date 16/11/15
   float get_threshold_for_floodplain_QQ(string q_q_filename, float threshold_condition, int lower_percentile, int upper_percentile);
 
-  /// @brief Function to calculate the reliability of floodplain method
-  /// @param ActualRaster raster of actual values
-  /// @author FJC
-  /// @date 26/06/16
-  vector<float> AnalysisOfQuality(LSDRaster& ActualRaster);
-
   /// @brief Get the lengths in spatial units of each part of the channel network, divided by strahler order.
   /// @param StreamNetwork Raster of the stream network coded by strahler order.
   /// @param FlowDir Array of flowdirections from FlowInfo (Not D-inf).
@@ -2169,13 +2473,13 @@ class LSDRaster
   /// @param mean Mean value of the distribution to draw values from.
   /// @author SWDG
   /// @date 9/6/16
-  LSDRaster PoupulateRasterGaussian(float minimum, float mean);
+  LSDRaster PopulateRasterGaussian(float minimum, float mean);
 
   /// @brief Populate a raster with a single value.
   /// @param value Value to populate all non nodata cells with.
-  /// @author SWDG
-  /// @date 9/6/16
-  LSDRaster PoupulateRasterSingleValue(float value);
+  /// @author SWDG SMM
+  /// @date 9/6/16 update 07/05/2021 to get edges
+  LSDRaster PopulateRasterSingleValue(float value);
 
   /// @brief Write CHT and hilltop gradient data to a *.csv file, coded by UTM coordinates as well as lat/long.
   ///
@@ -2197,6 +2501,43 @@ class LSDRaster
   /// @author SWDG
   /// @date 2/11/16
   void HilltopsToCSV(LSDRaster& CHT, LSDRaster& CHT_gradient, LSDRaster& gradient, int UTMZone, bool isNorth, int eId, string filename);
+
+  /// @brief Sample the values of 3 input rasters that intersect with the point a,b within
+  /// the area defined by threshold.
+  ///
+  /// @param Raster1 First LSDRaster to sample.
+  /// @param Raster2 Second LSDRaster to sample.
+  /// @param Raster3 Third LSDRaster to sample.
+  /// @param a Integer row index of point to sample.
+  /// @param b Integer col index of point to sample.
+
+  /// @param threshold The number of cells of hilltop to sample.
+  /// @return A vector of vectors of floats, containing the sampled values for each raster.
+  /// @author SWDG
+  /// @date 23/1/17
+  vector< vector<float> > Sample_Along_Ridge(LSDRaster& Raster1, LSDRaster& Raster2, LSDRaster& Raster3, int a, int b, int threshold);
+
+  /// @brief function to convert feet to metres using US international feet,
+  /// where 1 foot = 0.3048006096012192 metres.
+  /// @return raster of elevations in metres
+  /// @author FJC
+  /// @date 16/10/17
+  LSDRaster convert_from_feet_to_metres();
+
+  /// @brief function to convert elevations from centimetres to metres
+  /// @return raster of elevations in metres
+  /// @author FJC
+  /// @date 18/10/17
+  LSDRaster convert_from_centimetres_to_metres();
+
+
+  /// @brief EXPERIMENTAL: Implementation of RichDEM breaching algorithm
+  /// @Brief originally from Lindsay et al., 2016 DOI: DOI:https://doi.org/10.1002/hyp.10648
+  /// @return LSDRaster carved
+  /// @author BG
+  /// @date 31/10/2018 (spooky!)
+  LSDRaster Breaching_Lindsay2016();
+
 
 protected:
 
@@ -2235,6 +2576,9 @@ protected:
               double cellsize, int ndv, Array2D<double> data);
   void create(int ncols, int nrows, float xmin, float ymin,
               float cellsize, float ndv, Array2D<float> data, map<string,string> GRS);
+  void create(LSDIndexRaster& IntLSDRaster);
+  void create(int nrows, int ncols, float xmin, float ymin,
+            float cellsize, float ndv, Array2D<float>& data, bool copy_data);
 
 };
 
